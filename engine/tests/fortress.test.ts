@@ -6,7 +6,7 @@ import { build } from "./helpers";
 
 describe("Festungs-Mehrheit (§7 [ANNAHME])", () => {
   it("mehr eigene als gegnerische Einheiten auf E/F = Mehrheit", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E13" }], {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" }], {
       current: "BLUE",
     });
     expect(hasFortressMajority(s, "BLUE")).toBe(true);
@@ -14,14 +14,14 @@ describe("Festungs-Mehrheit (§7 [ANNAHME])", () => {
 
   it("Gleichstand ist keine Mehrheit (strikt)", () => {
     const s = build([
-      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E13" },
-      { id: "r", type: "INFANTRY", owner: "RED", at: "F13" },
+      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" },
+      { id: "r", type: "INFANTRY", owner: "RED", at: "F11" },
     ]);
     expect(hasFortressMajority(s, "BLUE")).toBe(false);
   });
 
   it("erhöht den Zähler am Zugende bei Mehrheit", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E13" }], {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" }], {
       current: "BLUE",
     });
     const s2 = endTurn(s);
@@ -29,17 +29,17 @@ describe("Festungs-Mehrheit (§7 [ANNAHME])", () => {
   });
 
   it("Zähler resettet, sobald die Mehrheit verloren geht (§7)", () => {
-    const s = build([{ id: "r", type: "INFANTRY", owner: "RED", at: "E13" }], {
+    const s = build([{ id: "r", type: "INFANTRY", owner: "RED", at: "E11" }], {
       current: "BLUE",
       fortressCounters: { RED: 0, BLUE: 2 },
     });
-    // Blau hält keine Mehrheit mehr (Rot steht auf E13).
+    // Blau hält keine Mehrheit mehr (Rot steht auf E11).
     const s2 = endTurn(s);
     expect(s2.fortressCounters.BLUE).toBe(0);
   });
 
   it("Mehrheit über 3 aufeinanderfolgende Zugenden = Sieg (§7)", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E13" }], {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" }], {
       current: "BLUE",
       fortressCounters: { RED: 0, BLUE: 2 },
     });
@@ -51,7 +51,7 @@ describe("Festungs-Mehrheit (§7 [ANNAHME])", () => {
 
 describe("Festungs-Heilung (§7)", () => {
   it("heilt +2 zu Beginn des eigenen Zuges auf gegnerischem Festungsfeld", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E13", hp: 7 }], {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11", hp: 7 }], {
       current: "RED", // Rot beendet -> Blau am Zug, Heilung
     });
     const s2 = endTurn(s);
@@ -60,7 +60,7 @@ describe("Festungs-Heilung (§7)", () => {
   });
 
   it("Heilung ist bei 10 HP gedeckelt (§7)", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E13", hp: 9 }], {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11", hp: 9 }], {
       current: "RED",
     });
     const s2 = endTurn(s);

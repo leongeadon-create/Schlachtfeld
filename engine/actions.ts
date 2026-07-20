@@ -151,7 +151,7 @@ export function getLegalActions(state: GameState, unitId: string): CostedAction[
       addPawnActions(state, unit, occ, push);
       break;
     case "LIGHT_CAV":
-      addSlideActions(state, unit, occ, DIAG, push);
+      addSlideActions(state, unit, occ, DIAG, push, state.rules.lightCavIgnoresBlockade);
       break;
     case "HEAVY_CAV":
       addSlideActions(state, unit, occ, ORTHO, push);
@@ -234,12 +234,16 @@ function addPawnActions(
 }
 
 // Gleitende Figuren (Läufer/Turm/Dame): Linien bis zur Blockade (§5.2).
+// ignoreBlockade=true (Hausregel für Läufer): zieht durch Figuren hindurch —
+// jedes leere Feld der Linie ist erreichbar, jeder Gegner angreifbar, eigene
+// Figuren werden nur übersprungen (kein Landen), nichts stoppt die Linie.
 function addSlideActions(
   state: GameState,
   unit: Unit,
   occ: Map<string, Unit>,
   dirs: Delta[],
   push: (a: CostedAction) => void,
+  ignoreBlockade = false,
 ) {
   const marchCost = actionCost(state, unit, "MARCH");
   const attackCost = actionCost(state, unit, "MARCH_ATTACK");
@@ -258,7 +262,7 @@ function addSlideActions(
             cost: attackCost,
           });
         }
-        break; // eigene wie gegnerische Figur blockiert die Linie
+        if (!ignoreBlockade) break; // sonst blockiert jede Figur die Linie
       }
       cur = add(cur, d);
     }

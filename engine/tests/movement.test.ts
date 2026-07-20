@@ -73,6 +73,20 @@ describe("Marsch & Blockade (§5.2)", () => {
     expect(t).toContain("D3");
   });
 
+  it("Läufer zieht diagonal durch Figuren hindurch (Hausregel)", () => {
+    const s = build([
+      { id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" },
+      { id: "own", type: "INFANTRY", owner: "BLUE", at: "F5" }, // eigene Figur auf Diagonale
+      { id: "foe", type: "INFANTRY", owner: "RED", at: "G6" }, // Gegner dahinter
+    ]);
+    const acts = getLegalActions(s, "l");
+    const march = targets(acts, "MARCH");
+    const atk = targets(acts, "MARCH_ATTACK");
+    expect(march).not.toContain("F5"); // eigenes Feld: kein Landen
+    expect(atk).toContain("G6"); // Gegner hinter eigener Figur angreifbar
+    expect(march).toContain("H7"); // hinter dem Gegner weiter (durch)
+  });
+
   it("Turm zieht gerade Linien, blockiert durch eigene Figur (§5.2)", () => {
     const s = build([
       { id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" },
@@ -114,7 +128,7 @@ describe("Marsch & Blockade (§5.2)", () => {
   it("Dame kombiniert gerade + diagonale Linien (§6.5)", () => {
     const s = build([{ id: "d", type: "QUEEN", owner: "BLUE", at: "E7" }]);
     const t = targets(getLegalActions(s, "d"), "MARCH");
-    expect(t).toContain("E13"); // gerade
+    expect(t).toContain("E11"); // gerade
     expect(t).toContain("A3"); // diagonal
     expect(t).toContain("I11"); // diagonal
   });

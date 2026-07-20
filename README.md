@@ -68,6 +68,18 @@ Aktionstypen: `STEP`, `PUSH`, `MARCH`, `MARCH_ATTACK`, `SHOOT`, `SHOOT_RIDE`
   (Schuss + Nachritt zählen als eine Aktivierung).
 - **Zug beenden:** wechselt zum Gegner (Boten füllen auf, Festungs-Heilung).
 
+## Hausregeln (Abweichungen von SPEC.md)
+
+Aus dem Playtest übernommen, als Flags in `rules.config.ts` gekapselt:
+
+- **Brett auf 11 Reihen verkürzt** (Ur-Reihen 6 & 8 entfernt): Rot steht auf
+  Reihen 8–11 (Festung E11/F11), Blau auf 1–4 (Festung E1/F1), Niemandsland
+  sind die Reihen 5–7.
+- **Läufer zieht diagonal durch Figuren hindurch** (`lightCavIgnoresBlockade`):
+  Er überspringt eigene wie gegnerische Figuren, landet auf leeren Feldern oder
+  schlägt Gegner per Marschangriff — nur eigene Felder bleiben tabu. Turm und
+  Dame bleiben regulär blockiert.
+
 ## Regel-Flags
 
 Alle mit `[ANNAHME]` markierten Auslegungen aus `SPEC.md` sind als benannte

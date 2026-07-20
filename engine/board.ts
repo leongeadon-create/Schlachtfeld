@@ -5,14 +5,14 @@ import type { GameState, Player, Position, Unit, UnitType } from "./types";
 import { DEFAULT_RULES, type RulesConfig } from "./rules.config";
 
 export const COLS = 10; // A..J
-export const ROWS = 13; // 1..13
+export const ROWS = 11; // 1..11 (Reihen 6 & 8 des Ur-Bretts entfernt — Hausregel)
 export const MIN_ROW = 1;
-export const MAX_ROW = 13;
+export const MAX_ROW = 11;
 
-// Festungsfelder (§2). Rote Grundlinie: E13,F13 — Blaue Grundlinie: E1,F1.
+// Festungsfelder. Rote Grundlinie: E11,F11 — Blaue Grundlinie: E1,F1.
 export const RED_FORTRESS: Position[] = [
-  { col: 4, row: 13 }, // E13
-  { col: 5, row: 13 }, // F13
+  { col: 4, row: 11 }, // E11
+  { col: 5, row: 11 }, // F11
 ];
 export const BLUE_FORTRESS: Position[] = [
   { col: 4, row: 1 }, // E1
@@ -28,7 +28,7 @@ export function opponent(player: Player): Player {
   return player === "RED" ? "BLUE" : "RED";
 }
 
-/** Vorwärtsrichtung (Δrow) für Bauern. Rot oben (10–13) zieht abwärts, Blau aufwärts. */
+/** Vorwärtsrichtung (Δrow) für Bauern. Rot oben (8–11) zieht abwärts, Blau aufwärts. */
 export function forwardDir(player: Player): number {
   return player === "RED" ? -1 : 1;
 }
@@ -68,17 +68,18 @@ export function isFortress(p: Position, side: Player): boolean {
   return fields.some((f) => posEq(f, p));
 }
 
-// --- Startaufstellung (§2) --------------------------------------------------
+// --- Startaufstellung -------------------------------------------------------
 // Zeilen als String über Spalten B..I (Index 1..8). Punkt = leer.
 // Rot (Großbuchstaben), Blau (Kleinbuchstaben).
-//   13 | T T · K D · T T
-//   12 | L S S L L S S L
-//   11 | B B B B B B B B
-//   10 | B B B B B B B B
+// Brett auf 11 Reihen verkürzt (Ur-Reihen 6 & 8 entfernt): Niemandsland = 5,6,7.
+//   11 | T T · K D · T T   (Rote Grundlinie/Festung E11,F11)
+//   10 | L S S L L S S L
+//    9 | B B B B B B B B
+//    8 | B B B B B B B B
 //    4 | b b b b b b b b
 //    3 | b b b b b b b b
 //    2 | l s s l l s s l
-//    1 | t t · k d · t t
+//    1 | t t · k d · t t   (Blaue Grundlinie/Festung E1,F1)
 
 const SYMBOL_TO_TYPE: Record<string, UnitType> = {
   B: "INFANTRY",
@@ -96,10 +97,10 @@ interface RowSpec {
 }
 
 const LAYOUT: RowSpec[] = [
-  { row: 13, owner: "RED", cells: "TT.KD.TT" },
-  { row: 12, owner: "RED", cells: "LSSLLSSL" },
-  { row: 11, owner: "RED", cells: "BBBBBBBB" },
-  { row: 10, owner: "RED", cells: "BBBBBBBB" },
+  { row: 11, owner: "RED", cells: "TT.KD.TT" },
+  { row: 10, owner: "RED", cells: "LSSLLSSL" },
+  { row: 9, owner: "RED", cells: "BBBBBBBB" },
+  { row: 8, owner: "RED", cells: "BBBBBBBB" },
   { row: 4, owner: "BLUE", cells: "BBBBBBBB" },
   { row: 3, owner: "BLUE", cells: "BBBBBBBB" },
   { row: 2, owner: "BLUE", cells: "LSSLLSSL" },

@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import {
   applyAction,
+  COLS,
   createInitialState,
   fortressCounts,
   getLegalActions,
   isFortress,
   posKey,
+  ROWS,
   toAlgebraic,
   unitAt,
   type CostedAction,
@@ -14,8 +16,6 @@ import {
 } from "../engine";
 import { ACTION_LABEL, UNIT_META } from "./units";
 
-const COLS = 10;
-const ROWS = 13;
 const LETTERS = "ABCDEFGHIJ";
 
 function isAttack(t: CostedAction["type"]): boolean {

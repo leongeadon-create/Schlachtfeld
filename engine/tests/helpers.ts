@@ -49,7 +49,7 @@ export function build(specs: USpec[], opts: BuildOpts = {}): GameState {
     const hasRedK = specs.some((s) => s.type === "GENERAL" && s.owner === "RED");
     const hasBlueK = specs.some((s) => s.type === "GENERAL" && s.owner === "BLUE");
     if (!hasRedK) {
-      units["AUTO_RED_K"] = mkGeneral("AUTO_RED_K", "RED", "A13", rules.maxHp);
+      units["AUTO_RED_K"] = mkGeneral("AUTO_RED_K", "RED", "A11", rules.maxHp);
     }
     if (!hasBlueK) {
       units["AUTO_BLUE_K"] = mkGeneral("AUTO_BLUE_K", "BLUE", "A1", rules.maxHp);

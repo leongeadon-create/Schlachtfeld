@@ -19,13 +19,14 @@ import { ACTION_LABEL, UNIT_META } from "./units";
 const LETTERS = "ABCDEFGHIJ";
 
 function isAttack(t: CostedAction["type"]): boolean {
-  return t === "PUSH" || t === "MARCH_ATTACK" || t === "SHOOT" || t === "SHOOT_RIDE";
+  return t === "STEP_ATTACK" || t === "MARCH_ATTACK" || t === "SHOOT";
 }
 
-function lineLabel(state: GameState, ids: string[]): string {
-  const first = toAlgebraic(state.units[ids[0]].pos);
-  const last = toAlgebraic(state.units[ids[ids.length - 1]].pos);
-  return `${first}–${last}`;
+function dirArrow(dir: { dc: number; dr: number }): string {
+  if (dir.dr > 0) return "↑";
+  if (dir.dr < 0) return "↓";
+  if (dir.dc > 0) return "→";
+  return "←";
 }
 
 export function App() {
@@ -40,20 +41,19 @@ export function App() {
     [state, selected],
   );
 
-  const lineCommands = useMemo(
+  const formations = useMemo(
     () =>
       legalForSelected.filter(
-        (a): a is Extract<CostedAction, { type: "LINE_COMMAND" }> =>
-          a.type === "LINE_COMMAND",
+        (a): a is Extract<CostedAction, { type: "FORMATION" }> => a.type === "FORMATION",
       ),
     [legalForSelected],
   );
 
-  // Zielfeld-Schlüssel -> mögliche Aktionen (mehrere z.B. Stoß vs. Marschangriff).
+  // Zielfeld-Schlüssel -> mögliche Aktionen (mehrere z.B. Nahangriff vs. Charge).
   const legalMap = useMemo(() => {
     const m = new Map<string, CostedAction[]>();
     for (const a of legalForSelected) {
-      if (a.type === "LINE_COMMAND") continue; // kein Einzelziel-Feld
+      if (a.type === "FORMATION") continue; // kein Einzelziel-Feld
       const p = "to" in a ? a.to : a.target;
       const k = posKey(p);
       const arr = m.get(k);
@@ -76,10 +76,9 @@ export function App() {
   }, [state]);
 
   function apply(action: CostedAction) {
-    const next = applyAction(state, action);
-    setState(next);
+    setState(applyAction(state, action));
     setChooser(null);
-    setSelected(next.pendingRide ? next.pendingRide.shooterId : null);
+    setSelected(null);
   }
 
   function onCellClick(pos: Position) {
@@ -180,16 +179,9 @@ export function App() {
                 {toAlgebraic(state.units[selected].pos)})
               </span>
             )}
-            {state.pendingRide && (
-              <span className="hint ride">
-                Nachritt möglich auf {toAlgebraic(state.pendingRide.target)} (+
-                {state.rules.rideCost} Bote) — Feld anklicken oder anders handeln.
-              </span>
-            )}
-            {lineCommands.map((lc, i) => (
-              <button key={i} className="btn line" onClick={() => apply(lc)}>
-                Linienbefehl {lc.unitIds.length}× ({lineLabel(state, lc.unitIds)}) ·{" "}
-                {lc.cost} Boten
+            {formations.map((f, i) => (
+              <button key={i} className="btn line" onClick={() => apply(f)}>
+                Formation {f.unitIds.length}× {dirArrow(f.dir)} · {f.cost} Boten
               </button>
             ))}
           </div>
@@ -294,7 +286,7 @@ function RowView({
 
 function UnitChip({ unit }: { unit: GameState["units"][string] }) {
   const meta = UNIT_META[unit.type];
-  const pct = Math.max(0, Math.min(100, (unit.hp / 10) * 100));
+  const pct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100));
   return (
     <span className={`unit ${unit.owner.toLowerCase()}`}>
       <span className="glyph" aria-hidden>

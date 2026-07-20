@@ -6,8 +6,7 @@ export * from "./rules.config";
 export {
   SETUP_PRESETS,
   DEFAULT_SETUP,
-  SETUP_V4,
-  SETUP_V3_CLASSIC,
+  SETUP_V6,
   type SetupName,
   type SetupRow,
 } from "./setup.config";
@@ -26,6 +25,7 @@ export {
   fromAlgebraic,
   unitAt,
   isFortress,
+  unitMaxHp,
   createInitialState,
   TYPE_TO_SYMBOL,
 } from "./board";
@@ -35,7 +35,8 @@ export {
   hasAffordableAction,
   applyAction,
   endTurn,
-  actionCost,
+  baseAttack,
+  computeDamage,
 } from "./actions";
 export {
   checkVictory,

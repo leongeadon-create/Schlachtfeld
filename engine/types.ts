@@ -1,5 +1,5 @@
 // engine/types.ts
-// Kernmodell für "Das Kompakte Schlachtfeld". Reines, UI-freies Modul.
+// Kernmodell für "Das Kompakte Schlachtfeld" (Version 6).
 // State ist immutabel: applyAction erzeugt immer einen neuen State.
 
 import type { RulesConfig } from "./rules.config";
@@ -8,13 +8,13 @@ export type Player = "RED" | "BLUE";
 
 export type UnitType =
   | "INFANTRY" // B  — Infanterie
-  | "ARCHER" //   S  — Berittene Bogenschützen (Springer + Schuss)
-  | "LIGHT_CAV" // L  — Leichte Kavallerie (Läufer/Bishop)
-  | "HEAVY_CAV" // T  — Schwere Kavallerie (Turm/Rook)
-  | "QUEEN" //    D  — Dame (Elite)
-  | "GENERAL"; //  K  — General / HQ
+  | "ARCHER" //   S  — Armbrustschützen (Schuss auf Ring-Abstand 2)
+  | "LIGHT_CAV" // L  — Läufer (echte Diagonalen)
+  | "HEAVY_CAV" // T  — Turm (gerade Linien)
+  | "QUEEN" //    D  — Dame
+  | "GENERAL"; //  K  — König / HQ
 
-/** Brettposition. col 0..9 (A..J), row 1..13. */
+/** Brettposition. col 0..9 (A..J), row 1..12. */
 export interface Position {
   col: number;
   row: number;
@@ -25,19 +25,19 @@ export interface Unit {
   type: UnitType;
   owner: Player;
   hp: number;
+  maxHp: number;
   pos: Position;
   /** true, sobald die Einheit ihr Startfeld je verlassen hat (Bauern-Doppelschritt). */
   hasMoved: boolean;
 }
 
 export type ActionType =
-  | "STEP" //          Schritt: 1 Feld auf leeres Feld
-  | "PUSH" //          Stoß: 1 Feld auf Gegner, 2 Schaden, bleibt stehen
-  | "MARCH" //         Marsch: Schachmuster auf leeres Feld
-  | "MARCH_ATTACK" //  Marschangriff: Schachmuster auf Gegner, 10 Schaden, nimmt Feld
-  | "SHOOT" //         Schützen-Schuss: Springer-Muster, 5 Schaden, ignoriert Blockaden
-  | "SHOOT_RIDE" //    Nachritt: +1 Bote, weitere 5 Schaden, nimmt Feld
-  | "LINE_COMMAND" //  Linienbefehl (V3): 2–4 Bauern je 1 Schritt vor
+  | "STEP" //          Schritt/Kavallerie-Schritt auf leeres Feld
+  | "STEP_ATTACK" //   Nahangriff im Stand (1 Bote), inkl. Kavallerie-Schritt-Angriff
+  | "MARCH" //         Marsch: voller Schachzug auf leeres Feld (2 Boten)
+  | "MARCH_ATTACK" //  Marsch-Angriff (2 Boten), Kavallerie-Charge/Durchbruch möglich
+  | "SHOOT" //         Armbrust-Schuss auf Ring-Abstand 2 (1 Bote)
+  | "FORMATION" //     Formationsbefehl: 2–6 Einheiten 1 Feld gleiche Richtung (2 Boten)
   | "PASS"; //         Zug beenden
 
 export interface StepAction {
@@ -45,8 +45,8 @@ export interface StepAction {
   unitId: string;
   to: Position;
 }
-export interface PushAction {
-  type: "PUSH";
+export interface StepAttackAction {
+  type: "STEP_ATTACK";
   unitId: string;
   target: Position;
 }
@@ -65,15 +65,10 @@ export interface ShootAction {
   unitId: string;
   target: Position;
 }
-export interface ShootRideAction {
-  type: "SHOOT_RIDE";
-  unitId: string;
-  target: Position;
-}
-export interface LineCommandAction {
-  type: "LINE_COMMAND";
-  /** Beteiligte Bauern von links nach rechts (2–4). */
-  unitIds: string[];
+export interface FormationAction {
+  type: "FORMATION";
+  unitIds: string[]; // 2–6 zusammenhängende Einheiten
+  dir: { dc: number; dr: number }; // gemeinsame Richtung (1 Feld)
 }
 export interface PassAction {
   type: "PASS";
@@ -81,12 +76,11 @@ export interface PassAction {
 
 export type Action =
   | StepAction
-  | PushAction
+  | StepAttackAction
   | MarchAction
   | MarchAttackAction
   | ShootAction
-  | ShootRideAction
-  | LineCommandAction
+  | FormationAction
   | PassAction;
 
 /** Kosten (Boten) einer konkreten Aktion — von getLegalActions mitgeliefert. */
@@ -105,24 +99,13 @@ export interface LogEntry {
   text: string;
 }
 
-export interface PendingRide {
-  shooterId: string;
-  target: Position;
-  /** Ziel starb bereits durch den Schuss allein (ANNAHME §6.2). */
-  targetAlreadyDead: boolean;
-}
-
 export interface GameState {
   units: Record<string, Unit>;
   currentPlayer: Player;
-  /** verbleibende Boten im aktuellen Zug */
   messengers: number;
-  /** in diesem Zug bereits aktivierte Einheiten */
   activatedUnitIds: string[];
   turnNumber: number;
-  /** aufeinanderfolgende Zugenden mit Festungs-Mehrheit */
   fortressCounters: Record<Player, number>;
-  pendingRide: PendingRide | null;
   winner: Victory | null;
   log: LogEntry[];
   rules: RulesConfig;

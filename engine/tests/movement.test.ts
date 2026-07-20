@@ -1,177 +1,109 @@
-// §5, §6 — Schritt/Stoß, Marsch/Marschangriff, Blockaden
+// V6 — Bewegung: Schritt, Kavallerie-Schritt, Marsch, Läufer-Blockade, Bauern
 import { describe, expect, it } from "vitest";
 import { applyAction, getLegalActions } from "../actions";
-import { fromAlgebraic, toAlgebraic, unitAt } from "../board";
-import { build } from "./helpers";
-import { makeRules } from "../rules.config";
-import type { CostedAction } from "../types";
+import { fromAlgebraic } from "../board";
+import { build, findAction } from "./helpers";
 
-function targets(actions: CostedAction[], type: string): string[] {
-  return actions
-    .filter((a) => a.type === type)
-    .map((a) =>
-      toAlgebraic("to" in a ? a.to : "target" in a ? a.target : { col: -1, row: -1 }),
-    )
-    .sort();
-}
+const has = (s: ReturnType<typeof build>, id: string, type: string, sq: string) =>
+  !!findAction(getLegalActions(s, id), type, sq);
 
-describe("Schritt & Stoß (§5.1)", () => {
-  it("Schritt bewegt 1 Feld auf ein leeres Feld für 1 Boten", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E4" }]);
-    const step = getLegalActions(s, "b").find((a) => a.type === "STEP" && toAlgebraic((a as any).to) === "E5")!;
-    expect(step.cost).toBe(1);
-    const s2 = applyAction(s, step);
-    expect(unitAt(s2, fromAlgebraic("E5"))?.id).toBe("b");
-    expect(s2.messengers).toBe(7);
+describe("Schritt & Kavallerie-Schritt (§4)", () => {
+  it("Schritt: 1 Feld jede Richtung auf leeres Feld", () => {
+    const s = build([{ id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" }]);
+    for (const sq of ["E5", "E3", "D4", "F4", "D5", "F5"]) expect(has(s, "t", "STEP", sq)).toBe(true);
   });
 
-  it("Stoß macht 2 Schaden und die Einheit bleibt stehen (§5.1)", () => {
+  it("Kavallerie-Schritt: 2 Felder gerade, Zwischenfeld frei (L/T/S)", () => {
+    const s = build([{ id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" }]);
+    expect(has(s, "t", "STEP", "E6")).toBe(true); // 2 gerade
+    expect(has(s, "t", "STEP", "G4")).toBe(true);
+    const blocked = build([
+      { id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" },
+      { id: "x", type: "INFANTRY", owner: "BLUE", at: "E5" }, // Zwischenfeld belegt
+    ]);
+    expect(has(blocked, "t", "STEP", "E6")).toBe(false);
+  });
+
+  it("Kavallerie-Schritt-Angriff über 2 Felder: Angreifer rückt aufs Zwischenfeld", () => {
     const s = build([
-      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E4" },
-      { id: "r", type: "INFANTRY", owner: "RED", at: "E5", hp: 10 },
+      { id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" },
+      { id: "e", type: "QUEEN", owner: "RED", at: "E6", hp: 10 },
     ]);
-    const push = getLegalActions(s, "b").find((a) => a.type === "PUSH")!;
-    expect(push.cost).toBe(1);
-    const s2 = applyAction(s, push);
-    expect(s2.units["r"].hp).toBe(8);
-    expect(s2.units["b"].pos).toEqual(fromAlgebraic("E4")); // bleibt stehen
-  });
-
-  it("Stoß-Kill lässt das Feld frei — kein Nachrücken (§5.1)", () => {
-    const s = build([
-      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E4" },
-      { id: "r", type: "INFANTRY", owner: "RED", at: "E5", hp: 2 },
-    ]);
-    const push = getLegalActions(s, "b").find((a) => a.type === "PUSH")!;
-    const s2 = applyAction(s, push);
-    expect(s2.units["r"]).toBeUndefined();
-    expect(unitAt(s2, fromAlgebraic("E5"))).toBeUndefined(); // Feld bleibt frei
-    expect(s2.units["b"].pos).toEqual(fromAlgebraic("E4"));
-  });
-
-  it("5× Frontal-Stoß tötet den Bauern (Autor-Beispiel: 5×2=10)", () => {
-    let s = build([
-      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E4", hp: 10 },
-      { id: "r", type: "INFANTRY", owner: "RED", at: "E5", hp: 10 },
-    ]);
-    for (let i = 0; i < 5; i++) {
-      const push = getLegalActions(s, "b").find((a) => a.type === "PUSH")!;
-      s = applyAction(s, push);
-      // frische Aktivierung simulieren (nur diese Einheit)
-      s = { ...s, activatedUnitIds: [], messengers: 8 };
-    }
-    expect(s.units["r"]).toBeUndefined();
+    const a = findAction(getLegalActions(s, "t"), "STEP_ATTACK", "E6")!;
+    const s2 = applyAction(s, a);
+    expect(s2.units["e"].hp).toBe(8); // Turm-Basis 2
+    expect(s2.units["t"].pos).toEqual(fromAlgebraic("E5")); // Zwischenfeld
   });
 });
 
-describe("Marsch & Blockade (§5.2)", () => {
-  it("Läufer zieht volle Diagonalen für 2 Boten", () => {
+describe("Läufer-Blockade (§5, Bugfix)", () => {
+  it("blockiert durch eigene Figur, teleportiert nicht", () => {
+    const s = build([
+      { id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" },
+      { id: "own", type: "INFANTRY", owner: "BLUE", at: "G6" },
+    ]);
+    expect(has(s, "l", "MARCH", "F5")).toBe(true);
+    expect(has(s, "l", "MARCH", "G6")).toBe(false); // eigenes Feld
+    expect(has(s, "l", "MARCH", "H7")).toBe(false); // NICHT dahinter (kein Teleport)
+  });
+
+  it("greift erste gegnerische Figur an, nicht dahinter", () => {
+    const s = build([
+      { id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" },
+      { id: "foe", type: "INFANTRY", owner: "RED", at: "G6" },
+    ]);
+    expect(has(s, "l", "MARCH", "F5")).toBe(true);
+    expect(has(s, "l", "MARCH_ATTACK", "G6")).toBe(true);
+    expect(has(s, "l", "MARCH", "H7")).toBe(false);
+    expect(has(s, "l", "MARCH_ATTACK", "H7")).toBe(false);
+  });
+
+  it("Farbwechsel per orthogonalem Schritt", () => {
     const s = build([{ id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" }]);
-    const march = getLegalActions(s, "l").filter((a) => a.type === "MARCH");
-    expect(march.every((a) => a.cost === 2)).toBe(true);
-    const t = targets(march, "MARCH");
-    expect(t).toContain("F5");
-    expect(t).toContain("H7"); // weit entfernt, frei
-    expect(t).toContain("D3");
-  });
-
-  it("Läufer überspringt eigene Figuren (Hausregel)", () => {
-    const s = build([
-      { id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" },
-      { id: "own", type: "INFANTRY", owner: "BLUE", at: "F5" }, // eigene Figur auf Diagonale
-    ]);
-    const march = targets(getLegalActions(s, "l"), "MARCH");
-    expect(march).not.toContain("F5"); // eigenes Feld: kein Landen
-    expect(march).toContain("G6"); // dahinter erreichbar (durch eigene hindurch)
-    expect(march).toContain("H7");
-  });
-
-  it("Läufer wird von gegnerischer Figur blockiert und stoppt dort (§5.2)", () => {
-    const s = build([
-      { id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" },
-      { id: "own", type: "INFANTRY", owner: "BLUE", at: "F5" }, // eigene Figur: wird übersprungen
-      { id: "foe", type: "INFANTRY", owner: "RED", at: "G6" }, // Gegner: blockiert
-    ]);
-    const acts = getLegalActions(s, "l");
-    const march = targets(acts, "MARCH");
-    const atk = targets(acts, "MARCH_ATTACK");
-    expect(march).not.toContain("F5"); // eigenes Feld
-    expect(atk).toContain("G6"); // erster Gegner angreifbar
-    expect(march).not.toContain("H7"); // dahinter blockiert — läuft nur bis zum Gegner
-    expect(atk).not.toContain("H7");
-  });
-
-  it("Turm zieht gerade Linien, blockiert durch eigene Figur (§5.2)", () => {
-    const s = build([
-      { id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" },
-      { id: "own", type: "INFANTRY", owner: "BLUE", at: "E7" },
-    ]);
-    const t = targets(getLegalActions(s, "t"), "MARCH");
-    expect(t).toContain("E5");
-    expect(t).toContain("E6");
-    expect(t).not.toContain("E7"); // eigenes Feld
-    expect(t).not.toContain("E8"); // dahinter blockiert
-  });
-
-  it("Marschangriff auf erste gegnerische Figur, nicht dahinter (§5.2)", () => {
-    const s = build([
-      { id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" },
-      { id: "e", type: "INFANTRY", owner: "RED", at: "E7" },
-      { id: "e2", type: "INFANTRY", owner: "RED", at: "E9" },
-    ]);
-    const acts = getLegalActions(s, "t");
-    const atk = targets(acts, "MARCH_ATTACK");
-    expect(atk).toContain("E7");
-    expect(atk).not.toContain("E9"); // hinter Blockade
-    const march = targets(acts, "MARCH");
-    expect(march).not.toContain("E8");
-  });
-
-  it("Marschangriff macht 10 Schaden, tötet und nimmt das Feld ein (§5.2)", () => {
-    const s = build([
-      { id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" },
-      { id: "e", type: "INFANTRY", owner: "RED", at: "E7", hp: 10 },
-    ]);
-    const atk = getLegalActions(s, "t").find((a) => a.type === "MARCH_ATTACK")!;
-    expect(atk.cost).toBe(2);
-    const s2 = applyAction(s, atk);
-    expect(s2.units["e"]).toBeUndefined();
-    expect(s2.units["t"].pos).toEqual(fromAlgebraic("E7")); // nimmt Feld
-  });
-
-  it("Dame kombiniert gerade + diagonale Linien (§6.5)", () => {
-    const s = build([{ id: "d", type: "QUEEN", owner: "BLUE", at: "E7" }]);
-    const t = targets(getLegalActions(s, "d"), "MARCH");
-    expect(t).toContain("E11"); // gerade
-    expect(t).toContain("A3"); // diagonal
-    expect(t).toContain("I11"); // diagonal
+    // orthogonaler 1-Feld-Schritt wechselt die Feldfarbe
+    expect(has(s, "l", "STEP", "E5")).toBe(true);
+    expect(has(s, "l", "STEP", "D4")).toBe(true);
   });
 });
 
-describe("General (§6.6)", () => {
-  it("König-Marschangriff macht 10 Schaden für 2 Boten [ANNAHME]", () => {
-    const s = build([
-      { id: "k", type: "GENERAL", owner: "BLUE", at: "E5" },
-      { id: "r", type: "INFANTRY", owner: "RED", at: "E6", hp: 10 },
-    ]);
-    const acts = getLegalActions(s, "k");
-    const push = acts.find((a) => a.type === "PUSH")!;
-    const march = acts.find((a) => a.type === "MARCH_ATTACK")!;
-    expect(push.cost).toBe(1); // billiger Stoß bleibt möglich (§5.1 [ANNAHME])
-    expect(march.cost).toBe(2);
-    const s2 = applyAction(s, march);
-    expect(s2.units["r"]).toBeUndefined();
-    expect(s2.units["k"].pos).toEqual(fromAlgebraic("E6"));
+describe("Bauern-Bewegung (V6)", () => {
+  it("Rückwärts-Zug auf leeres Feld erlaubt", () => {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E5" }]);
+    expect(has(s, "b", "STEP", "E4")).toBe(true); // rückwärts, leer
   });
 
-  it("König-Marschangriff kann per Flag deaktiviert werden", () => {
-    const s = build(
-      [
-        { id: "k", type: "GENERAL", owner: "BLUE", at: "E5" },
-        { id: "r", type: "INFANTRY", owner: "RED", at: "E6" },
-      ],
-      { rules: makeRules({ generalMarchAttackEnabled: false }) },
-    );
-    expect(getLegalActions(s, "k").some((a) => a.type === "MARCH_ATTACK")).toBe(false);
+  it("aber kein Rückwärts-Angriff", () => {
+    const s = build([
+      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E5" },
+      { id: "e", type: "INFANTRY", owner: "RED", at: "E4" }, // hinter dem Bauern
+      { id: "e2", type: "INFANTRY", owner: "RED", at: "D4" }, // diagonal hinten
+    ]);
+    expect(has(s, "b", "STEP_ATTACK", "E4")).toBe(false);
+    expect(has(s, "b", "STEP_ATTACK", "D4")).toBe(false);
+  });
+
+  it("Doppelschritt als erste Bewegung", () => {
+    const fresh = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E3" }]);
+    expect(has(fresh, "b", "STEP", "E5")).toBe(true);
+    const moved = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E3", hasMoved: true }]);
+    expect(has(moved, "b", "STEP", "E5")).toBe(false);
+  });
+});
+
+describe("Marsch (§4)", () => {
+  it("Turm marschiert gerade, blockiert wie im Schach", () => {
+    const s = build([
+      { id: "t", type: "HEAVY_CAV", owner: "BLUE", at: "E4" },
+      { id: "own", type: "INFANTRY", owner: "BLUE", at: "E8" },
+    ]);
+    expect(has(s, "t", "MARCH", "E7")).toBe(true);
+    expect(has(s, "t", "MARCH", "E8")).toBe(false);
+    expect(has(s, "t", "MARCH", "E9")).toBe(false);
+  });
+
+  it("Dame kombiniert gerade + diagonal", () => {
+    const s = build([{ id: "d", type: "QUEEN", owner: "BLUE", at: "E6" }]);
+    expect(has(s, "d", "MARCH", "E12")).toBe(true);
+    expect(has(s, "d", "MARCH", "A2")).toBe(true);
   });
 });

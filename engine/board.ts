@@ -6,18 +6,22 @@ import { DEFAULT_RULES, type RulesConfig } from "./rules.config";
 import { DEFAULT_SETUP, SETUP_PRESETS, type SetupName } from "./setup.config";
 
 export const COLS = 10; // A..J
-export const ROWS = 11; // 1..11 (Reihen 6 & 8 des Ur-Bretts entfernt — Hausregel)
+export const ROWS = 12; // 1..12 (V6)
 export const MIN_ROW = 1;
-export const MAX_ROW = 11;
+export const MAX_ROW = 12;
 
-// Festungsfelder. Rote Grundlinie: E11,F11 — Blaue Grundlinie: E1,F1.
+// Festungsfelder (V6): je 4 waagerecht auf D,E,F,G. Rote Grundlinie 12, blaue 1.
 export const RED_FORTRESS: Position[] = [
-  { col: 4, row: 11 }, // E11
-  { col: 5, row: 11 }, // F11
+  { col: 3, row: 12 }, // D12
+  { col: 4, row: 12 }, // E12
+  { col: 5, row: 12 }, // F12
+  { col: 6, row: 12 }, // G12
 ];
 export const BLUE_FORTRESS: Position[] = [
+  { col: 3, row: 1 }, // D1
   { col: 4, row: 1 }, // E1
   { col: 5, row: 1 }, // F1
+  { col: 6, row: 1 }, // G1
 ];
 
 /** Die Festungsfelder, die der Spieler EROBERN muss (die des Gegners). */
@@ -29,7 +33,7 @@ export function opponent(player: Player): Player {
   return player === "RED" ? "BLUE" : "RED";
 }
 
-/** Vorwärtsrichtung (Δrow) für Bauern. Rot oben (8–11) zieht abwärts, Blau aufwärts. */
+/** Vorwärtsrichtung (Δrow) für Bauern. Rot oben (9–12) zieht abwärts, Blau aufwärts. */
 export function forwardDir(player: Player): number {
   return player === "RED" ? -1 : 1;
 }
@@ -80,6 +84,11 @@ const SYMBOL_TO_TYPE: Record<string, UnitType> = {
   K: "GENERAL",
 };
 
+/** Maximal-HP je Einheitentyp (V6: Armbrustschützen 6, sonst 10). */
+export function unitMaxHp(type: UnitType, rules: RulesConfig = DEFAULT_RULES): number {
+  return type === "ARCHER" ? rules.archerMaxHp : rules.maxHp;
+}
+
 export function createInitialState(
   rules: RulesConfig = DEFAULT_RULES,
   setup: SetupName = DEFAULT_SETUP,
@@ -111,11 +120,13 @@ export function createInitialState(
       const col = i; // A == Index 0 (Reihe deckt Spalten A..J ab)
       counters[type] += 1;
       const id = `${prefix[spec.owner]}_${shortType[type]}_${counters[type]}`;
+      const maxHp = unitMaxHp(type, rules);
       units[id] = {
         id,
         type,
         owner: spec.owner,
-        hp: rules.maxHp,
+        hp: maxHp,
+        maxHp,
         pos: { col, row: spec.row },
         hasMoved: false,
       };
@@ -129,7 +140,6 @@ export function createInitialState(
     activatedUnitIds: [],
     turnNumber: 1,
     fortressCounters: { RED: 0, BLUE: 0 },
-    pendingRide: null,
     winner: null,
     log: [],
     rules,

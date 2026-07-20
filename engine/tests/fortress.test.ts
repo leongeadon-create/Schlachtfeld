@@ -1,45 +1,34 @@
-// §7 — Festung: Mehrheit, Zähler-Reset, Sieg, Heilung
+// V6 — Festung D–G (§7)
 import { describe, expect, it } from "vitest";
 import { endTurn } from "../actions";
 import { hasFortressMajority } from "../victory";
 import { build } from "./helpers";
 
-describe("Festungs-Mehrheit (§7 [ANNAHME])", () => {
-  it("mehr eigene als gegnerische Einheiten auf E/F = Mehrheit", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" }], {
-      current: "BLUE",
-    });
+describe("Festungs-Mehrheit auf D–G (§7)", () => {
+  it("eigene Einheit auf gegnerischer Festung = Mehrheit", () => {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E12" }], { current: "BLUE" });
     expect(hasFortressMajority(s, "BLUE")).toBe(true);
   });
 
-  it("Gleichstand ist keine Mehrheit (strikt)", () => {
+  it("zählt alle vier Felder D/E/F/G", () => {
     const s = build([
-      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" },
-      { id: "r", type: "INFANTRY", owner: "RED", at: "F11" },
+      { id: "b1", type: "INFANTRY", owner: "BLUE", at: "D12" },
+      { id: "b2", type: "INFANTRY", owner: "BLUE", at: "E12" },
+      { id: "r1", type: "INFANTRY", owner: "RED", at: "F12" },
+    ]);
+    expect(hasFortressMajority(s, "BLUE")).toBe(true); // 2 vs 1
+  });
+
+  it("Gleichstand ist keine Mehrheit", () => {
+    const s = build([
+      { id: "b", type: "INFANTRY", owner: "BLUE", at: "E12" },
+      { id: "r", type: "INFANTRY", owner: "RED", at: "F12" },
     ]);
     expect(hasFortressMajority(s, "BLUE")).toBe(false);
   });
 
-  it("erhöht den Zähler am Zugende bei Mehrheit", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" }], {
-      current: "BLUE",
-    });
-    const s2 = endTurn(s);
-    expect(s2.fortressCounters.BLUE).toBe(1);
-  });
-
-  it("Zähler resettet, sobald die Mehrheit verloren geht (§7)", () => {
-    const s = build([{ id: "r", type: "INFANTRY", owner: "RED", at: "E11" }], {
-      current: "BLUE",
-      fortressCounters: { RED: 0, BLUE: 2 },
-    });
-    // Blau hält keine Mehrheit mehr (Rot steht auf E11).
-    const s2 = endTurn(s);
-    expect(s2.fortressCounters.BLUE).toBe(0);
-  });
-
-  it("Mehrheit über 3 aufeinanderfolgende Zugenden = Sieg (§7)", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11" }], {
+  it("Sieg über 3 aufeinanderfolgende Zugenden", () => {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E12" }], {
       current: "BLUE",
       fortressCounters: { RED: 0, BLUE: 2 },
     });
@@ -47,31 +36,35 @@ describe("Festungs-Mehrheit (§7 [ANNAHME])", () => {
     expect(s2.fortressCounters.BLUE).toBe(3);
     expect(s2.winner).toEqual({ winner: "BLUE", type: "FORTRESS" });
   });
+
+  it("Zähler resettet bei verlorener Mehrheit", () => {
+    const s = build([{ id: "r", type: "INFANTRY", owner: "RED", at: "E12" }], {
+      current: "BLUE",
+      fortressCounters: { RED: 0, BLUE: 2 },
+    });
+    expect(endTurn(s).fortressCounters.BLUE).toBe(0);
+  });
 });
 
 describe("Festungs-Heilung (§7)", () => {
-  it("heilt +2 zu Beginn des eigenen Zuges auf gegnerischem Festungsfeld", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11", hp: 7 }], {
-      current: "RED", // Rot beendet -> Blau am Zug, Heilung
-    });
-    const s2 = endTurn(s);
-    expect(s2.currentPlayer).toBe("BLUE");
-    expect(s2.units["b"].hp).toBe(9);
-  });
-
-  it("Heilung ist bei 10 HP gedeckelt (§7)", () => {
-    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E11", hp: 9 }], {
+  it("heilt +2 zu Zugbeginn auf gegnerischem Festungsfeld", () => {
+    const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E12", hp: 7 }], {
       current: "RED",
     });
-    const s2 = endTurn(s);
-    expect(s2.units["b"].hp).toBe(10); // nicht 11
+    expect(endTurn(s).units["b"].hp).toBe(9);
   });
 
-  it("heilt nicht auf eigenem Festungsfeld", () => {
+  it("Heilung bei eigenem Maximum gedeckelt (Armbrust 6)", () => {
+    const s = build([{ id: "a", type: "ARCHER", owner: "BLUE", at: "E12", hp: 5 }], {
+      current: "RED",
+    });
+    expect(endTurn(s).units["a"].hp).toBe(6); // nicht 7
+  });
+
+  it("heilt nicht auf eigener Festung", () => {
     const s = build([{ id: "b", type: "INFANTRY", owner: "BLUE", at: "E1", hp: 7 }], {
       current: "RED",
     });
-    const s2 = endTurn(s);
-    expect(s2.units["b"].hp).toBe(7); // E1 ist Blaus eigene Festung
+    expect(endTurn(s).units["b"].hp).toBe(7);
   });
 });

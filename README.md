@@ -68,35 +68,21 @@ Aktionstypen: `STEP`, `PUSH`, `MARCH`, `MARCH_ATTACK`, `SHOOT`, `SHOOT_RIDE`
   (Schuss + Nachritt zählen als eine Aktivierung).
 - **Zug beenden:** wechselt zum Gegner (Boten füllen auf, Festungs-Heilung).
 
-## Regelstand: Version 5
+## Regelstand: Version 6
 
-Die aktuelle Regelbasis ist **SPEC.md Version 5** (siehe dortiges Changelog §0).
-Regeln sind als Flags in `rules.config.ts`, Aufstellungen als Presets in
-`engine/setup.config.ts` gekapselt.
+Die aktuelle Regelbasis ist **SPEC.md Version 6** (siehe dortiges Changelog §0).
+Ein kompaktes **Regel-Poster** liegt unter [`public/regeln.html`](./public/regeln.html)
+(im Spiel unter `/regeln.html` erreichbar).
 
-- **Startaufstellung V4** (`setup.config.ts`, Presets `v4` / `v3_classic`):
-  12 Bauern/Spieler — vordere Reihe nur 4 Bauern (C/E/F/H), hintere voll (B–I);
-  äußere Läufer auf den Flanken A/J. `createInitialState(rules, "v3_classic")`
-  liefert die alte Aufstellung.
-- **Brett 11 Reihen** (Ur-Reihen 6 & 8 entfernt): Rot 8–11 (Festung E11/F11),
-  Blau 1–4 (Festung E1/F1), Niemandsland 5–7.
-- **Läufer** wird nur von gegnerischen Einheiten blockiert
-  (`lightCavPassesOwnUnits`): eigene Figuren überspringt er, an der ersten
-  gegnerischen stoppt er (Marschangriff möglich). Turm/Dame bleiben voll blockiert.
-- **Bauern-Richtung** (`pawnNoBackwardStep`): Infanterie zieht/stößt nur
-  vorwärts, seitwärts, diagonal-vorwärts — kein Rückwärts.
-- **Diagonalschlag** (`pawnDiagonalDamage=5`): 5 statt 10 Schaden; nur bei Kill
-  rückt der Bauer nach. One-Hit-Kills bleiben Kavallerie/Dame/König & Schützen-Kombi.
-- **Linienbefehl** (`lineCommandEnabled`, 2 Boten): 2–4 horizontal benachbarte
-  Bauern ziehen gleichzeitig 1 Feld vor (nur freie Felder, kein Angriff).
-- **Schildwall** (`shieldWallEnabled`): Bauer mit eigenem Bauern links/rechts
-  erleidet aus Stößen 1 statt 2 Schaden.
-- **Generals-Aura** (`generalAuraEnabled`): eigene Einheit neben dem eigenen
-  König macht beim Stoß +1 Schaden.
-- **Stoßschaden-Formel:** `max(1, 2 + Aura(+1) − Schildwall(−1))`.
+- **Brett 10×12** — Blau 1–4, Rot 9–12, Niemandsland 5–8. **Festung D–G** je Grundreihe.
+- **Zermürbungs-Schaden** (kein One-Hit): `max(1, Grundangriff [×2 Charge] + Umzingelung + Aura − Schildwall)`.
+  - Grundangriffe: Läufer/Turm 2, Armbrust-Schuss 3, Dame/König 4, Bauer-Diagonal 2, sonst 1.
+- **Armbrustschützen** (6 HP) ersetzen die Bogenschützen: Ringschuss auf Abstand 2, über Blockaden.
+- **Kavallerie-Charge** (Turm/Läufer, ≥3 bewegte Felder) = doppelter Grundangriff, plus
+  **Durchbruch + Lanzendurchstich**.
+- **Läufer-Fix**: echte Diagonalen, Blockade wie im Schach.
+- **Kavallerie-Schritt** (L/T/S bis 2 Felder), Bauern-Doppelschritt, Rückwärts-Zug ohne Angriff.
+- **Formationsbefehl** (2 Boten): 2–6 zusammenhängende Einheiten 1 Feld gleiche Richtung.
 
-## Regel-Flags
-
-Alle mit `[ANNAHME]` markierten Auslegungen aus `SPEC.md` sind als benannte
-Flags in [`engine/rules.config.ts`](./engine/rules.config.ts) gekapselt und
-lassen sich für Playtests umschalten (`makeRules({ ... })`).
+Aufstellung als Preset: `createInitialState(rules, "v6")`. Alle Werte sind Flags in
+[`engine/rules.config.ts`](./engine/rules.config.ts) (`makeRules({ ... })`).

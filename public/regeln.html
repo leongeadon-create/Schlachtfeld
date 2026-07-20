@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Das Kompakte Schlachtfeld — Regeln (V6)</title>
+    <style>
+      :root {
+        --bg: #0f131b;
+        --panel: #1a2030;
+        --panel2: #222b3d;
+        --ink: #e9edf5;
+        --muted: #9aa7bd;
+        --line: #2c3852;
+        --gold: #d9a441;
+        --red: #e5484d;
+        --blue: #4b8bf5;
+        --move: #57c07a;
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(900px 600px at 80% -10%, #1b2233, var(--bg)) fixed;
+        color: var(--ink);
+        line-height: 1.5;
+      }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+      header.poster {
+        text-align: center;
+        border-bottom: 2px solid var(--gold);
+        padding-bottom: 18px;
+        margin-bottom: 26px;
+      }
+      header.poster .kicker {
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        font-size: 12px;
+        color: var(--gold);
+        font-family: system-ui, sans-serif;
+      }
+      header.poster h1 {
+        font-size: clamp(28px, 5vw, 46px);
+        margin: 6px 0 4px;
+        text-wrap: balance;
+      }
+      header.poster p { color: var(--muted); margin: 0; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px 20px;
+      }
+      .card.wide { grid-column: 1 / -1; }
+      h2 {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin: 0 0 12px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 8px;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-family: system-ui, sans-serif; font-weight: 600; font-size: 12px; }
+      td.num, th.num { text-align: center; font-variant-numeric: tabular-nums; }
+      .glyph { font-size: 18px; }
+      .formula {
+        background: var(--panel2);
+        border-left: 3px solid var(--gold);
+        border-radius: 6px;
+        padding: 12px 14px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 14px;
+      }
+      ul { margin: 8px 0 0; padding-left: 20px; }
+      li { margin: 5px 0; }
+      .muted { color: var(--muted); }
+      .chip {
+        display: inline-block; padding: 1px 8px; border-radius: 999px;
+        font-size: 12px; font-family: system-ui, sans-serif; font-weight: 600;
+      }
+      .chip.red { background: #4a2023; color: #ffd7d8; }
+      .chip.blue { background: #1e3358; color: #d6e4ff; }
+      .chip.gold { background: #3a2c10; color: var(--gold); }
+      /* Armbrust-Ring 5x5 */
+      .ring {
+        display: grid; grid-template-columns: repeat(5, 1fr);
+        gap: 4px; max-width: 260px; margin: 4px auto 0;
+      }
+      .ring div {
+        aspect-ratio: 1; border-radius: 5px; display: flex;
+        align-items: center; justify-content: center; font-size: 13px;
+        background: var(--panel2); color: var(--muted);
+      }
+      .ring .hit { background: rgba(87,192,122,.22); box-shadow: inset 0 0 0 2px var(--move); color: var(--move); }
+      .ring .dead { background: rgba(229,72,77,.15); color: #e58a8d; }
+      .ring .self { background: var(--gold); color: #1a1305; font-weight: 700; }
+      .legend-line { font-size: 12px; color: var(--muted); font-family: system-ui, sans-serif; margin-top: 8px; text-align: center; }
+      footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 28px; }
+      a { color: var(--gold); }
+      @media print { body { background: #fff; color: #111; } .card { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="poster">
+        <div class="kicker">Regel-Poster · Version 6</div>
+        <h1>Das Kompakte Schlachtfeld</h1>
+        <p>Schachbasiertes Kriegsspiel für 2 Spieler · Hotseat</p>
+      </header>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Das Brett</h2>
+          <ul>
+            <li><strong>10 Spalten (A–J) × 12 Reihen.</strong></li>
+            <li><span class="chip blue">Blau</span> startet unten (Reihen 1–4),
+              <span class="chip red">Rot</span> oben (9–12).</li>
+            <li>Niemandsland: Reihen 5–8.</li>
+            <li><strong>Festung:</strong> je 4 waagerechte Felder <strong>D,E,F,G</strong>
+              auf Reihe 1 (blau) und Reihe 12 (rot).</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Boten (Aktionspunkte)</h2>
+          <ul>
+            <li><strong>8 Boten</strong> pro Zug, ungenutzte verfallen.</li>
+            <li>Jede Einheit nur <strong>einmal</strong> pro Zug.</li>
+          </ul>
+          <table style="margin-top:10px">
+            <tr><th>Aktion</th><th class="num">Boten</th></tr>
+            <tr><td>Schritt / Kavallerie-Schritt / Nahangriff</td><td class="num">1</td></tr>
+            <tr><td>Armbrust-Schuss</td><td class="num">1</td></tr>
+            <tr><td>Marsch / Marsch-Angriff</td><td class="num">2</td></tr>
+            <tr><td>Formationsbefehl</td><td class="num">2</td></tr>
+          </table>
+        </section>
+
+        <section class="card wide">
+          <h2>Einheiten</h2>
+          <table>
+            <tr>
+              <th>Einheit</th><th class="num">Anz.</th><th class="num">HP</th>
+              <th class="num">Grundangriff</th><th>Bewegung</th>
+            </tr>
+            <tr><td><span class="glyph">♟</span> Infanterie (B)</td><td class="num">16</td><td class="num">10</td>
+              <td class="num">2 diagonal-vor / sonst 1</td><td>Schritt 1 (rückwärts nur ziehen), Doppelschritt</td></tr>
+            <tr><td><span class="glyph">♘</span> Armbrustschütze (S)</td><td class="num">4</td><td class="num">6</td>
+              <td class="num">3 (Schuss)</td><td>Kav-Schritt bis 2; Schuss Ring-Abstand 2</td></tr>
+            <tr><td><span class="glyph">♝</span> Läufer (L)</td><td class="num">4</td><td class="num">10</td>
+              <td class="num">2</td><td>Diagonalen (blockiert), Kav-Schritt bis 2</td></tr>
+            <tr><td><span class="glyph">♜</span> Turm (T)</td><td class="num">4</td><td class="num">10</td>
+              <td class="num">2</td><td>Gerade Linien, Kav-Schritt bis 2</td></tr>
+            <tr><td><span class="glyph">♛</span> Dame (D)</td><td class="num">1</td><td class="num">10</td>
+              <td class="num">4</td><td>Gerade + diagonal (keine Charge)</td></tr>
+            <tr><td><span class="glyph">♚</span> König / HQ (K)</td><td class="num">1</td><td class="num">10</td>
+              <td class="num">4</td><td>Schritt 1 Feld</td></tr>
+          </table>
+          <p class="muted" style="font-size:13px;margin-top:8px">„Alle sonstigen Angriffe" = 1 (z. B. Armbrust-Nahangriff, gerader Bauern-Stoß).</p>
+        </section>
+
+        <section class="card wide">
+          <h2>Schadenssystem (Zermürbung)</h2>
+          <div class="formula">
+            Schaden = Grundangriff&nbsp;<span class="muted">[×2 bei Charge]</span>
+            + Umzingelung + Aura − Schildwall &nbsp;&nbsp;(Minimum 1)
+          </div>
+          <ul>
+            <li><span class="chip gold">Umzingelung</span> je angreifer-eigenem Nachbarn des Ziels
+              <strong>über den ersten hinaus +2</strong> (2 = +2, 3 = +4, 4 = +6 …).</li>
+            <li><span class="chip gold">Aura</span> Angreifer auf einem der 8 Felder um den <strong>eigenen König</strong> → +1.</li>
+            <li><span class="chip gold">Schildwall</span> Ziel-Bauer mit eigenem Bauern direkt links/rechts → −1
+              (nur gegen Nahangriffe, nicht gegen Schüsse).</li>
+            <li>Ein Feld stirbt erst bei <strong>0 HP</strong> — kein One-Hit mehr.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Bewegung & Angriff</h2>
+          <ul>
+            <li><strong>Schritt (1):</strong> 1 Feld jede Richtung; auf Gegner = Nahangriff im Stand.</li>
+            <li><strong>Kavallerie-Schritt:</strong> L/T/S bis 2 Felder gerade (Zwischenfeld frei).</li>
+            <li><strong>Marsch (2):</strong> voller Schachzug, blockiert; Angriff am Zielfeld mit Grundangriff.</li>
+            <li><strong>Kavallerie-Charge:</strong> Turm/Läufer bewegt <strong>≥3 freie Felder</strong> →
+              <strong>doppelter</strong> Grundangriff.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Durchbruch &amp; Lanzendurchstich</h2>
+          <p class="muted" style="font-size:13px;margin:0 0 6px">Nur bei Kavallerie-Charge, wenn das Ziel stirbt:</p>
+          <ul>
+            <li>Feld dahinter <strong>frei</strong> → 1 Feld nachrücken.</li>
+            <li>Gegner dahinter → <strong>Überschuss − 1</strong> (Schaden minus Rest-HP des Ziels)
+              kettet nach hinten weiter, je −1.</li>
+            <li>Eigene Einheit dahinter → Momentum stoppt (kein Friendly Fire).</li>
+            <li>Wird das Feld durch die Kette frei → Nachrücken trotzdem möglich.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Armbrust — Ring-Abstand 2</h2>
+          <div class="ring" aria-hidden="true">
+            <div class="hit">✕</div><div class="hit">✕</div><div class="hit">✕</div><div class="hit">✕</div><div class="hit">✕</div>
+            <div class="hit">✕</div><div class="dead">·</div><div class="dead">·</div><div class="dead">·</div><div class="hit">✕</div>
+            <div class="hit">✕</div><div class="dead">·</div><div class="self">S</div><div class="dead">·</div><div class="hit">✕</div>
+            <div class="hit">✕</div><div class="dead">·</div><div class="dead">·</div><div class="dead">·</div><div class="hit">✕</div>
+            <div class="hit">✕</div><div class="hit">✕</div><div class="hit">✕</div><div class="hit">✕</div><div class="hit">✕</div>
+          </div>
+          <p class="legend-line">
+            <span style="color:var(--move)">✕ Ziel (3 Schaden)</span> ·
+            <span style="color:#e58a8d">· tote Zone</span> · schießt über Einheiten hinweg
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>Formationsbefehl</h2>
+          <ul>
+            <li><strong>2 Boten.</strong> 2–6 zusammenhängende eigene Einheiten (Reihe waagerecht/senkrecht).</li>
+            <li>Alle 1 Feld in <strong>dieselbe Richtung</strong>.</li>
+            <li>Blockiert durch Gegner → Angriff; durch Eigene → bleibt stehen. Infanterie nicht rückwärts.</li>
+            <li>Zählt als Aktivierung aller Beteiligten.</li>
+          </ul>
+        </section>
+
+        <section class="card wide">
+          <h2>Sieg</h2>
+          <ul>
+            <li><strong>Generalsmord:</strong> gegnerischer König fällt auf 0 HP.</li>
+            <li><strong>Festung:</strong> Mehrheit auf den 4 Feldern D–G der gegnerischen Grundreihe über
+              <strong>3 aufeinanderfolgende Zugenden</strong>. Heilung dort: +2 HP zu Zugbeginn (bis Maximum).</li>
+          </ul>
+        </section>
+      </div>
+
+      <footer>
+        Das Kompakte Schlachtfeld · Regeln V6 · <a href="./">zum Spiel</a>
+      </footer>
+    </div>
+  </body>
+</html>

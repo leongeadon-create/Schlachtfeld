@@ -1,4 +1,4 @@
-// ui/units.ts — Anzeige-Metadaten für Einheitentypen.
+// ui/units.ts — Anzeige-Metadaten für Einheitentypen (V6).
 import type { UnitType } from "../engine";
 
 export const UNIT_META: Record<
@@ -6,19 +6,18 @@ export const UNIT_META: Record<
   { symbol: string; label: string; glyph: string }
 > = {
   INFANTRY: { symbol: "B", label: "Infanterie", glyph: "♟" },
-  ARCHER: { symbol: "S", label: "Ber. Bogenschütze", glyph: "♘" },
-  LIGHT_CAV: { symbol: "L", label: "Leichte Kavallerie", glyph: "♝" },
-  HEAVY_CAV: { symbol: "T", label: "Schwere Kavallerie", glyph: "♜" },
+  ARCHER: { symbol: "S", label: "Armbrustschütze", glyph: "♘" },
+  LIGHT_CAV: { symbol: "L", label: "Läufer", glyph: "♝" },
+  HEAVY_CAV: { symbol: "T", label: "Turm", glyph: "♜" },
   QUEEN: { symbol: "D", label: "Dame", glyph: "♛" },
-  GENERAL: { symbol: "K", label: "General / HQ", glyph: "♚" },
+  GENERAL: { symbol: "K", label: "König / HQ", glyph: "♚" },
 };
 
 export const ACTION_LABEL: Record<string, string> = {
-  STEP: "Schritt",
-  PUSH: "Stoß",
+  STEP: "Zug",
+  STEP_ATTACK: "Nahangriff",
   MARCH: "Marsch",
-  MARCH_ATTACK: "Marschangriff",
+  MARCH_ATTACK: "Marsch-Angriff",
   SHOOT: "Schuss",
-  SHOOT_RIDE: "Nachritt",
-  LINE_COMMAND: "Linienbefehl",
+  FORMATION: "Formation",
 };

@@ -1,6 +1,9 @@
-# SPEC.md — Das Kompakte Schlachtfeld (Version 4)
+# SPEC.md — Das Kompakte Schlachtfeld (Version 5)
 Schachbasiertes Kriegsspiel für 2 Spieler. Diese Spezifikation ist die einzige Wahrheitsquelle.
 Mit `[ANNAHME]` markierte Regeln sind Auslegungen des Autors-Feedbacks — implementiere sie so, aber kapsle sie als Flags in `rules.config.ts`.
+
+## 0. Änderungen in Version 5
+- **Läufer-Blockade korrigiert (§5.2):** Der Läufer wird **nur von gegnerischen** Einheiten blockiert, **nicht von eigenen** — er überspringt eigene Figuren (landet aber nicht auf ihnen) und läuft **bis zur ersten gegnerischen Einheit** (die er per Marschangriff schlagen kann), aber nicht dahinter. (Flag `lightCavPassesOwnUnits`, ersetzt das frühere „ignoriert alle Blockaden".)
 
 ## 0. Änderungen in Version 4
 - **Neue Startaufstellung (§2):** Pro Spieler nur noch **12 Bauern**. Die vordere Bauernreihe (Rot Reihe 8, Blau Reihe 4) hat nur 4 Bauern auf **C, E, F, H**; die hintere Reihe (Rot 9, Blau 3) bleibt voll (B–I). Die **äußeren Läufer wandern auf die Flanken A/J** (Rot A10/J10, Blau A2/J2); B/I der Kavalleriereihe bleiben leer. Alle übrigen Einheiten unverändert.
@@ -13,7 +16,7 @@ Alle neuen Regeln sind als benannte Flags in `rules.config.ts` gekapselt.
 
 Bereits aus dem Playtest übernommen:
 - **Brett auf 11 Reihen verkürzt** (Ur-Reihen 6 & 8 entfernt). Rot auf Reihen 8–11 (Festung E11/F11), Blau auf 1–4 (Festung E1/F1), Niemandsland = Reihen 5–7. (`board.ts`)
-- **Läufer zieht diagonal durch Figuren hindurch** (ignoriert Blockaden, landet nicht auf eigenen Feldern; Turm/Dame bleiben blockiert). (Flag `lightCavIgnoresBlockade`)
+- **Läufer zieht durch eigene Figuren hindurch** (in V5 präzisiert: nur eigene Figuren werden übersprungen, gegnerische blockieren; Turm/Dame bleiben voll blockiert). (Flag `lightCavPassesOwnUnits`)
 
 Neu in Version 3:
 1. **Bauern-Richtung:** Infanterie zieht/stößt nur **vorwärts, seitwärts, diagonal-vorwärts** — kein Rückwärts. Andere Einheiten unverändert. (Flag `pawnNoBackwardStep`)
@@ -93,7 +96,7 @@ Alle Einheiten starten mit und heilen maximal bis **10 HP**.
 ### 5.2 Der Marsch (mit Marschangriff)
 - Einheit zieht im **vollen Schachmuster** ihres Typs — in **alle Richtungen, auch rückwärts, unbegrenzt weit** (frühere Rückwärtsbremsen sind gestrichen).
 - Endet der Zug auf einer gegnerischen Einheit → **Marschangriff: 10 Schaden (tötet immer)**, das Feld wird eingenommen, die Einheit steht danach dort.
-- **Blockaden wie im Schach:** eigene und gegnerische Einheiten blockieren die Zuglinien von Turm und Dame. Nur der Schützen-Schuss und — seit V3 — der **Läufer** ignorieren Blockaden: Der Läufer zieht diagonal durch Figuren hindurch, landet aber nie auf einem eigenen Feld. (Flag `lightCavIgnoresBlockade`)
+- **Blockaden wie im Schach:** eigene und gegnerische Einheiten blockieren die Zuglinien von Turm und Dame. Der **Läufer** (V5) wird dagegen **nur von gegnerischen** Einheiten blockiert: Er überspringt eigene Figuren (landet nicht auf ihnen) und läuft bis zur ersten gegnerischen Einheit (Marschangriff möglich), nicht dahinter. Der Schützen-Schuss ignoriert weiterhin alle Blockaden. (Flag `lightCavPassesOwnUnits`)
 
 ## 6. Einheitenregeln im Detail
 

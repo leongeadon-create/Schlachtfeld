@@ -75,18 +75,30 @@ describe("Marsch & Blockade (§5.2)", () => {
     expect(t).toContain("D3");
   });
 
-  it("Läufer zieht diagonal durch Figuren hindurch (Hausregel)", () => {
+  it("Läufer überspringt eigene Figuren (Hausregel)", () => {
     const s = build([
       { id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" },
       { id: "own", type: "INFANTRY", owner: "BLUE", at: "F5" }, // eigene Figur auf Diagonale
-      { id: "foe", type: "INFANTRY", owner: "RED", at: "G6" }, // Gegner dahinter
+    ]);
+    const march = targets(getLegalActions(s, "l"), "MARCH");
+    expect(march).not.toContain("F5"); // eigenes Feld: kein Landen
+    expect(march).toContain("G6"); // dahinter erreichbar (durch eigene hindurch)
+    expect(march).toContain("H7");
+  });
+
+  it("Läufer wird von gegnerischer Figur blockiert und stoppt dort (§5.2)", () => {
+    const s = build([
+      { id: "l", type: "LIGHT_CAV", owner: "BLUE", at: "E4" },
+      { id: "own", type: "INFANTRY", owner: "BLUE", at: "F5" }, // eigene Figur: wird übersprungen
+      { id: "foe", type: "INFANTRY", owner: "RED", at: "G6" }, // Gegner: blockiert
     ]);
     const acts = getLegalActions(s, "l");
     const march = targets(acts, "MARCH");
     const atk = targets(acts, "MARCH_ATTACK");
-    expect(march).not.toContain("F5"); // eigenes Feld: kein Landen
-    expect(atk).toContain("G6"); // Gegner hinter eigener Figur angreifbar
-    expect(march).toContain("H7"); // hinter dem Gegner weiter (durch)
+    expect(march).not.toContain("F5"); // eigenes Feld
+    expect(atk).toContain("G6"); // erster Gegner angreifbar
+    expect(march).not.toContain("H7"); // dahinter blockiert — läuft nur bis zum Gegner
+    expect(atk).not.toContain("H7");
   });
 
   it("Turm zieht gerade Linien, blockiert durch eigene Figur (§5.2)", () => {

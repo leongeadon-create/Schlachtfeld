@@ -15,8 +15,9 @@ export interface RulesConfig {
   // Marsch (§5.2) für L, T, D, S
   marchCost: number; // 2 Boten
   marchAttackDamage: number; // 10 Schaden (tötet immer)
-  /** Hausregel: Läufer zieht diagonal durch Figuren hindurch (ignoriert Blockaden). */
-  lightCavIgnoresBlockade: boolean;
+  /** Hausregel: Läufer wird von eigenen Einheiten NICHT blockiert (zieht durch sie
+   *  hindurch), von gegnerischen schon — er läuft bis zur ersten gegnerischen Einheit. */
+  lightCavPassesOwnUnits: boolean;
 
   // Infanterie (§6.1)
   pawnMoveCost: number; // 1 Bote für alle Bauern-Schachzüge
@@ -78,7 +79,7 @@ export const DEFAULT_RULES: RulesConfig = {
 
   marchCost: 2,
   marchAttackDamage: 10,
-  lightCavIgnoresBlockade: true,
+  lightCavPassesOwnUnits: true,
 
   pawnMoveCost: 1,
   cheapPawnDiagonalKill: true,

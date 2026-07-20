@@ -68,9 +68,9 @@ Aktionstypen: `STEP`, `PUSH`, `MARCH`, `MARCH_ATTACK`, `SHOOT`, `SHOOT_RIDE`
   (Schuss + Nachritt zählen als eine Aktivierung).
 - **Zug beenden:** wechselt zum Gegner (Boten füllen auf, Festungs-Heilung).
 
-## Regelstand: Version 4
+## Regelstand: Version 5
 
-Die aktuelle Regelbasis ist **SPEC.md Version 4** (siehe dortiges Changelog §0).
+Die aktuelle Regelbasis ist **SPEC.md Version 5** (siehe dortiges Changelog §0).
 Regeln sind als Flags in `rules.config.ts`, Aufstellungen als Presets in
 `engine/setup.config.ts` gekapselt.
 
@@ -80,8 +80,9 @@ Regeln sind als Flags in `rules.config.ts`, Aufstellungen als Presets in
   liefert die alte Aufstellung.
 - **Brett 11 Reihen** (Ur-Reihen 6 & 8 entfernt): Rot 8–11 (Festung E11/F11),
   Blau 1–4 (Festung E1/F1), Niemandsland 5–7.
-- **Läufer** zieht diagonal durch Figuren hindurch (`lightCavIgnoresBlockade`);
-  Turm/Dame bleiben blockiert.
+- **Läufer** wird nur von gegnerischen Einheiten blockiert
+  (`lightCavPassesOwnUnits`): eigene Figuren überspringt er, an der ersten
+  gegnerischen stoppt er (Marschangriff möglich). Turm/Dame bleiben voll blockiert.
 - **Bauern-Richtung** (`pawnNoBackwardStep`): Infanterie zieht/stößt nur
   vorwärts, seitwärts, diagonal-vorwärts — kein Rückwärts.
 - **Diagonalschlag** (`pawnDiagonalDamage=5`): 5 statt 10 Schaden; nur bei Kill

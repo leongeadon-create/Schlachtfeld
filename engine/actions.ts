@@ -160,7 +160,7 @@ export function getLegalActions(state: GameState, unitId: string): CostedAction[
       addLineCommands(state, unit, occ, push);
       break;
     case "LIGHT_CAV":
-      addSlideActions(state, unit, occ, DIAG, push, state.rules.lightCavIgnoresBlockade);
+      addSlideActions(state, unit, occ, DIAG, push, state.rules.lightCavPassesOwnUnits);
       break;
     case "HEAVY_CAV":
       addSlideActions(state, unit, occ, ORTHO, push);
@@ -318,16 +318,16 @@ function computePushDamage(state: GameState, attacker: Unit, target: Unit): numb
 }
 
 // Gleitende Figuren (Läufer/Turm/Dame): Linien bis zur Blockade (§5.2).
-// ignoreBlockade=true (Hausregel für Läufer): zieht durch Figuren hindurch —
-// jedes leere Feld der Linie ist erreichbar, jeder Gegner angreifbar, eigene
-// Figuren werden nur übersprungen (kein Landen), nichts stoppt die Linie.
+// passOwnUnits=true (Hausregel für Läufer): eigene Figuren werden übersprungen
+// (kein Landen, aber die Linie läuft weiter), gegnerische Figuren blockieren
+// weiterhin — der Läufer läuft also bis zur ersten gegnerischen Einheit.
 function addSlideActions(
   state: GameState,
   unit: Unit,
   occ: Map<string, Unit>,
   dirs: Delta[],
   push: (a: CostedAction) => void,
-  ignoreBlockade = false,
+  passOwnUnits = false,
 ) {
   const marchCost = actionCost(state, unit, "MARCH");
   const attackCost = actionCost(state, unit, "MARCH_ATTACK");
@@ -337,16 +337,18 @@ function addSlideActions(
       const occU = occ.get(posKey(cur));
       if (!occU) {
         push({ type: "MARCH", unitId: unit.id, to: { ...cur }, cost: marchCost });
+      } else if (occU.owner !== unit.owner) {
+        push({
+          type: "MARCH_ATTACK",
+          unitId: unit.id,
+          target: { ...cur },
+          cost: attackCost,
+        });
+        break; // gegnerische Figur blockiert immer
       } else {
-        if (occU.owner !== unit.owner) {
-          push({
-            type: "MARCH_ATTACK",
-            unitId: unit.id,
-            target: { ...cur },
-            cost: attackCost,
-          });
-        }
-        if (!ignoreBlockade) break; // sonst blockiert jede Figur die Linie
+        // eigene Figur
+        if (!passOwnUnits) break;
+        // sonst: überspringen, Linie läuft weiter
       }
       cur = add(cur, d);
     }

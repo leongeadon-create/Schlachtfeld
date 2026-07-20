@@ -10,9 +10,9 @@ function count(state: ReturnType<typeof createInitialState>, owner: "RED" | "BLU
 describe("Startaufstellung", () => {
   const s = createInitialState();
 
-  it("hat pro Spieler die korrekte Einheitenzahl (§3)", () => {
+  it("hat pro Spieler die korrekte Einheitenzahl (§3, V4)", () => {
     for (const owner of ["RED", "BLUE"] as const) {
-      expect(count(s, owner, "INFANTRY")).toBe(16);
+      expect(count(s, owner, "INFANTRY")).toBe(12); // V4: 8 + 4
       expect(count(s, owner, "ARCHER")).toBe(4);
       expect(count(s, owner, "LIGHT_CAV")).toBe(4);
       expect(count(s, owner, "HEAVY_CAV")).toBe(4);
@@ -32,16 +32,12 @@ describe("Startaufstellung", () => {
     expect(redK.pos).toEqual({ col: 4, row: 11 }); // E11
   });
 
-  it("lässt A/J-Flanken und das Niemandsland (Reihen 5–7) leer", () => {
+  it("hält das Niemandsland (Reihen 5–7) leer", () => {
     const occupied = new Set(Object.values(s.units).map((u) => `${u.pos.col},${u.pos.row}`));
     for (let row = 5; row <= 7; row++) {
       for (let col = 0; col < 10; col++) {
         expect(occupied.has(`${col},${row}`)).toBe(false);
       }
-    }
-    for (const u of Object.values(s.units)) {
-      expect(u.pos.col).not.toBe(0); // A
-      expect(u.pos.col).not.toBe(9); // J
     }
   });
 

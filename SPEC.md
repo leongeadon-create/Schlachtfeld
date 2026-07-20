@@ -1,6 +1,12 @@
-# SPEC.md — Das Kompakte Schlachtfeld (Version 3)
+# SPEC.md — Das Kompakte Schlachtfeld (Version 4)
 Schachbasiertes Kriegsspiel für 2 Spieler. Diese Spezifikation ist die einzige Wahrheitsquelle.
 Mit `[ANNAHME]` markierte Regeln sind Auslegungen des Autors-Feedbacks — implementiere sie so, aber kapsle sie als Flags in `rules.config.ts`.
+
+## 0. Änderungen in Version 4
+- **Neue Startaufstellung (§2):** Pro Spieler nur noch **12 Bauern**. Die vordere Bauernreihe (Rot Reihe 8, Blau Reihe 4) hat nur 4 Bauern auf **C, E, F, H**; die hintere Reihe (Rot 9, Blau 3) bleibt voll (B–I). Die **äußeren Läufer wandern auf die Flanken A/J** (Rot A10/J10, Blau A2/J2); B/I der Kavalleriereihe bleiben leer. Alle übrigen Einheiten unverändert.
+- **Aufstellung als Preset (§2):** Die Startaufstellungen liegen in `engine/setup.config.ts`. Aktuell: `v4` (Standard) und `v3_classic` (die vorherige Aufstellung mit 16 Bauern, Läufer auf B/I).
+
+> Hinweis zur Nummerierung: Die neue Aufstellung bezieht sich auf das aktuelle **11-Reihen-Brett** (V3). Rot-Reihen wurden entsprechend abgebildet (hintere Bauern 9, vordere 8, Kavallerie 10).
 
 ## 0. Änderungen in Version 3
 Alle neuen Regeln sind als benannte Flags in `rules.config.ts` gekapselt.
@@ -29,27 +35,27 @@ Neu in Version 3:
 ## 2. Das Brett
 - **10 Spalten (A–J) × 11 Reihen (1–11).** *(V3: Ur-Reihen 6 & 8 entfernt.)*
 - Rot startet oben (Reihen 8–11), Blau unten (Reihen 1–4). Niemandsland = Reihen 5–7.
-- Flanken A & J: normale, bespielbare Felder — starten nur leer.
+- Flanken A & J: normale, bespielbare Felder — ab **V4** stehen dort die äußeren Läufer (Kavalleriereihe), sonst leer.
 - **Festungsfelder:** E11 + F11 (rote Grundlinie) und E1 + F1 (blaue Grundlinie).
 
-### Startaufstellung
-| Reihe | Spalten B–I |
-|---|---|
-| 11 | T T · K D · T T |
-| 10 | L S S L L S S L |
-| 9  | B B B B B B B B |
-| 8  | B B B B B B B B |
-| 4  | b b b b b b b b |
-| 3  | b b b b b b b b |
-| 2  | l s s l l s s l |
-| 1  | t t · k d · t t |
+### Startaufstellung (V4)
+| Reihe | A | B | C | D | E | F | G | H | I | J |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 11 | · | T | T | · | K | D | · | T | T | · |
+| 10 | L | · | S | S | L | L | S | S | · | L |
+| 9  | · | B | B | B | B | B | B | B | B | · |
+| 8  | · | · | B | · | B | B | · | B | · | · |
+| 4  | · | · | b | · | b | b | · | b | · | · |
+| 3  | · | b | b | b | b | b | b | b | b | · |
+| 2  | l | · | s | s | l | l | s | s | · | l |
+| 1  | · | t | t | · | k | d | · | t | t | · |
 
-Großbuchstaben = Rot, Kleinbuchstaben = Blau. Reihen 5–7 leer. Spalten A/J und D/G der Grundreihen leer.
+Großbuchstaben = Rot, Kleinbuchstaben = Blau. Reihen 5–7 leer. Pro Spieler: **12 Bauern** (8 hinten + 4 vorn auf C/E/F/H), 4 Läufer (A/E/F/J), 4 Schützen (C/D/G/H), 4 Türme, 1 Dame, 1 General.
 
 ## 3. Einheiten
 | Einheit | Symbol | Anzahl | HP |
 |---|---|---|---|
-| Infanterie | B | 16 | 10 |
+| Infanterie | B | 12 *(V4, vorher 16)* | 10 |
 | Berittene Bogenschützen | S | 4 | 10 |
 | Leichte Kavallerie (Läufer) | L | 4 | 10 |
 | Schwere Kavallerie (Turm) | T | 4 | 10 |
@@ -143,9 +149,11 @@ Alle Einheiten starten mit und heilen maximal bis **10 HP**.
 ## 8. Technische Vorgaben
 - **Stack:** TypeScript. Engine als reines, UI-freies Modul (`/engine`), UI getrennt (`/ui`, React oder Vanilla + Canvas).
 - Engine-API: `getLegalActions(state, unitId)`, `applyAction(state, action) → newState`, `checkVictory(state)`. State immutabel.
+- **Startaufstellung als Preset (V4):** `engine/setup.config.ts` mit `SETUP_PRESETS` (`v4`, `v3_classic`); `createInitialState(rules, setup)` wählt das Preset.
 - Aktionstypen im Modell: `STEP`, `PUSH` (Stoß), `MARCH`, `MARCH_ATTACK`, `SHOOT`, `SHOOT_RIDE`, `LINE_COMMAND` (V3).
 - **Unit-Tests für jede Regel in §4–§7**, insbesondere: Botenbudget-Grenzen, 1-Aktivierung-pro-Einheit inkl. Schuss-Kombi-Ausnahme, Blockade-Logik, Schuss durch Blockaden, Läufer-Durchzug, Stoß-Kill ohne Nachrücken, Nachritt nur nach eigenem Schuss aufs selbe Ziel, Festungszähler-Reset, Heilungs-Cap, Bauern-Doppelschritt nur als erste Aktion der Einheit.
 - **V3-Tests:** Bauer kann nicht rückwärts; Diagonalschlag 5 Schaden mit/ohne Nachrücken; Linienbefehl mit 2–4 Bauern, teilblockierter Linie und Aktivierungssperre; Schildwall nur bei horizontalem Bauern-Nachbarn und nur gegen Stöße; Generals-Aura nur um den eigenen König und nur für Stöße; kombinierter Fall Aura+Schildwall = 2 Schaden.
+- **V4-Tests:** korrekte neue Startaufstellung beider Seiten; Läufer auf A/J haben ab Zug 1 mindestens einen legalen Marsch; Bauernanzahl = 12; Preset `v3_classic` liefert weiterhin die alte Aufstellung (16 Bauern, Läufer auf B/I).
 - Alle `[ANNAHME]`-Regeln als benannte Flags in `rules.config.ts`.
 
 ## 9. Bewusst offen (nicht in v1 implementieren)

@@ -3,6 +3,7 @@
 
 import type { GameState, Player, Position, Unit, UnitType } from "./types";
 import { DEFAULT_RULES, type RulesConfig } from "./rules.config";
+import { DEFAULT_SETUP, SETUP_PRESETS, type SetupName } from "./setup.config";
 
 export const COLS = 10; // A..J
 export const ROWS = 11; // 1..11 (Reihen 6 & 8 des Ur-Bretts entfernt — Hausregel)
@@ -68,19 +69,8 @@ export function isFortress(p: Position, side: Player): boolean {
   return fields.some((f) => posEq(f, p));
 }
 
-// --- Startaufstellung -------------------------------------------------------
-// Zeilen als String über Spalten B..I (Index 1..8). Punkt = leer.
-// Rot (Großbuchstaben), Blau (Kleinbuchstaben).
-// Brett auf 11 Reihen verkürzt (Ur-Reihen 6 & 8 entfernt): Niemandsland = 5,6,7.
-//   11 | T T · K D · T T   (Rote Grundlinie/Festung E11,F11)
-//   10 | L S S L L S S L
-//    9 | B B B B B B B B
-//    8 | B B B B B B B B
-//    4 | b b b b b b b b
-//    3 | b b b b b b b b
-//    2 | l s s l l s s l
-//    1 | t t · k d · t t   (Blaue Grundlinie/Festung E1,F1)
-
+// --- Startaufstellung (§2, §3) ----------------------------------------------
+// Die konkreten Aufstellungen liegen als Presets in setup.config.ts (V4).
 const SYMBOL_TO_TYPE: Record<string, UnitType> = {
   B: "INFANTRY",
   S: "ARCHER",
@@ -90,24 +80,10 @@ const SYMBOL_TO_TYPE: Record<string, UnitType> = {
   K: "GENERAL",
 };
 
-interface RowSpec {
-  row: number;
-  owner: Player;
-  cells: string; // 8 Zeichen für Spalten B..I
-}
-
-const LAYOUT: RowSpec[] = [
-  { row: 11, owner: "RED", cells: "TT.KD.TT" },
-  { row: 10, owner: "RED", cells: "LSSLLSSL" },
-  { row: 9, owner: "RED", cells: "BBBBBBBB" },
-  { row: 8, owner: "RED", cells: "BBBBBBBB" },
-  { row: 4, owner: "BLUE", cells: "BBBBBBBB" },
-  { row: 3, owner: "BLUE", cells: "BBBBBBBB" },
-  { row: 2, owner: "BLUE", cells: "LSSLLSSL" },
-  { row: 1, owner: "BLUE", cells: "TT.KD.TT" },
-];
-
-export function createInitialState(rules: RulesConfig = DEFAULT_RULES): GameState {
+export function createInitialState(
+  rules: RulesConfig = DEFAULT_RULES,
+  setup: SetupName = DEFAULT_SETUP,
+): GameState {
   const units: Record<string, Unit> = {};
   const counters: Record<UnitType, number> = {
     INFANTRY: 0,
@@ -127,12 +103,12 @@ export function createInitialState(rules: RulesConfig = DEFAULT_RULES): GameStat
     GENERAL: "K",
   };
 
-  for (const spec of LAYOUT) {
+  for (const spec of SETUP_PRESETS[setup]) {
     for (let i = 0; i < spec.cells.length; i++) {
       const sym = spec.cells[i];
       if (sym === ".") continue;
       const type = SYMBOL_TO_TYPE[sym];
-      const col = i + 1; // Spalte B == Index 1
+      const col = i; // A == Index 0 (Reihe deckt Spalten A..J ab)
       counters[type] += 1;
       const id = `${prefix[spec.owner]}_${shortType[type]}_${counters[type]}`;
       units[id] = {

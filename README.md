@@ -68,11 +68,16 @@ Aktionstypen: `STEP`, `PUSH`, `MARCH`, `MARCH_ATTACK`, `SHOOT`, `SHOOT_RIDE`
   (Schuss + Nachritt zählen als eine Aktivierung).
 - **Zug beenden:** wechselt zum Gegner (Boten füllen auf, Festungs-Heilung).
 
-## Regelstand: Version 3
+## Regelstand: Version 4
 
-Die aktuelle Regelbasis ist **SPEC.md Version 3** (siehe dortiges Changelog §0).
-Alle Regeln sind als Flags in `rules.config.ts` gekapselt:
+Die aktuelle Regelbasis ist **SPEC.md Version 4** (siehe dortiges Changelog §0).
+Regeln sind als Flags in `rules.config.ts`, Aufstellungen als Presets in
+`engine/setup.config.ts` gekapselt.
 
+- **Startaufstellung V4** (`setup.config.ts`, Presets `v4` / `v3_classic`):
+  12 Bauern/Spieler — vordere Reihe nur 4 Bauern (C/E/F/H), hintere voll (B–I);
+  äußere Läufer auf den Flanken A/J. `createInitialState(rules, "v3_classic")`
+  liefert die alte Aufstellung.
 - **Brett 11 Reihen** (Ur-Reihen 6 & 8 entfernt): Rot 8–11 (Festung E11/F11),
   Blau 1–4 (Festung E1/F1), Niemandsland 5–7.
 - **Läufer** zieht diagonal durch Figuren hindurch (`lightCavIgnoresBlockade`);

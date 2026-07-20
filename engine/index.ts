@@ -4,6 +4,14 @@
 export * from "./types";
 export * from "./rules.config";
 export {
+  SETUP_PRESETS,
+  DEFAULT_SETUP,
+  SETUP_V4,
+  SETUP_V3_CLASSIC,
+  type SetupName,
+  type SetupRow,
+} from "./setup.config";
+export {
   COLS,
   ROWS,
   RED_FORTRESS,

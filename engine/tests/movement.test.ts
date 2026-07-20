@@ -9,7 +9,9 @@ import type { CostedAction } from "../types";
 function targets(actions: CostedAction[], type: string): string[] {
   return actions
     .filter((a) => a.type === type)
-    .map((a) => toAlgebraic("to" in a ? a.to : a.target))
+    .map((a) =>
+      toAlgebraic("to" in a ? a.to : "target" in a ? a.target : { col: -1, row: -1 }),
+    )
     .sort();
 }
 

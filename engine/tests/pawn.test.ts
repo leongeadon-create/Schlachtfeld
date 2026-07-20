@@ -5,9 +5,10 @@ import { fromAlgebraic, toAlgebraic } from "../board";
 import { build } from "./helpers";
 
 function has(actions: ReturnType<typeof getLegalActions>, type: string, sq: string) {
-  return actions.some(
-    (a) => a.type === type && toAlgebraic("to" in a ? a.to : a.target) === sq,
-  );
+  return actions.some((a) => {
+    if (a.type !== type || a.type === "LINE_COMMAND") return false;
+    return toAlgebraic("to" in a ? a.to : a.target) === sq;
+  });
 }
 
 describe("Bauern-Doppelschritt (§6.1, §8)", () => {
@@ -45,8 +46,8 @@ describe("Bauern-Doppelschritt (§6.1, §8)", () => {
   });
 });
 
-describe("Bauern-Diagonalschlag (§6.1)", () => {
-  it("Diagonalschlag vorwärts = Marschangriff (10 Schaden, 1 Boten) [ANNAHME]", () => {
+describe("Bauern-Diagonalschlag (§6.1, V3)", () => {
+  it("Diagonalschlag vorwärts kostet 1 Boten und macht 5 Schaden", () => {
     const s = build([
       { id: "b", type: "INFANTRY", owner: "BLUE", at: "E4" },
       { id: "e", type: "INFANTRY", owner: "RED", at: "F5", hp: 10 },
@@ -54,8 +55,8 @@ describe("Bauern-Diagonalschlag (§6.1)", () => {
     const atk = getLegalActions(s, "b").find((a) => a.type === "MARCH_ATTACK")!;
     expect(atk.cost).toBe(1);
     const s2 = applyAction(s, atk);
-    expect(s2.units["e"]).toBeUndefined();
-    expect(s2.units["b"].pos).toEqual(fromAlgebraic("F5")); // nimmt Feld
+    expect(s2.units["e"].hp).toBe(5); // überlebt
+    expect(s2.units["b"].pos).toEqual(fromAlgebraic("E4")); // bleibt stehen
   });
 
   it("kein Marschangriff geradeaus — nur Stoß möglich", () => {
@@ -70,14 +71,13 @@ describe("Bauern-Diagonalschlag (§6.1)", () => {
     expect(has(acts, "STEP", "E5")).toBe(false);
   });
 
-  it("Diagonalschlag rückwärts gibt es nicht", () => {
-    // Blau zieht aufwärts; ein Gegner rückwärts-diagonal (F3) ist kein Marschangriff.
+  it("kein Stoß und kein Schlag rückwärts-diagonal (V3)", () => {
     const s = build([
       { id: "b", type: "INFANTRY", owner: "BLUE", at: "E4" },
       { id: "e", type: "INFANTRY", owner: "RED", at: "F3", hp: 10 },
     ]);
     const acts = getLegalActions(s, "b");
     expect(acts.some((a) => a.type === "MARCH_ATTACK")).toBe(false);
-    expect(has(acts, "PUSH", "F3")).toBe(true); // Stoß bleibt (§5.1)
+    expect(has(acts, "PUSH", "F3")).toBe(false); // rückwärts verboten
   });
 });

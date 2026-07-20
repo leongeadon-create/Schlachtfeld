@@ -20,4 +20,5 @@ export const ACTION_LABEL: Record<string, string> = {
   MARCH_ATTACK: "Marschangriff",
   SHOOT: "Schuss",
   SHOOT_RIDE: "Nachritt",
+  LINE_COMMAND: "Linienbefehl",
 };

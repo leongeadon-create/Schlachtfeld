@@ -295,6 +295,12 @@ body {
 .btn.ghost {
   background: transparent;
 }
+.btn.line {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: #d6e4ff;
+  font-size: 13px;
+}
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

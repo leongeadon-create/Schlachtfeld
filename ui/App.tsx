@@ -22,6 +22,12 @@ function isAttack(t: CostedAction["type"]): boolean {
   return t === "PUSH" || t === "MARCH_ATTACK" || t === "SHOOT" || t === "SHOOT_RIDE";
 }
 
+function lineLabel(state: GameState, ids: string[]): string {
+  const first = toAlgebraic(state.units[ids[0]].pos);
+  const last = toAlgebraic(state.units[ids[ids.length - 1]].pos);
+  return `${first}–${last}`;
+}
+
 export function App() {
   const [state, setState] = useState<GameState>(() => createInitialState());
   const [selected, setSelected] = useState<string | null>(null);
@@ -34,10 +40,20 @@ export function App() {
     [state, selected],
   );
 
+  const lineCommands = useMemo(
+    () =>
+      legalForSelected.filter(
+        (a): a is Extract<CostedAction, { type: "LINE_COMMAND" }> =>
+          a.type === "LINE_COMMAND",
+      ),
+    [legalForSelected],
+  );
+
   // Zielfeld-Schlüssel -> mögliche Aktionen (mehrere z.B. Stoß vs. Marschangriff).
   const legalMap = useMemo(() => {
     const m = new Map<string, CostedAction[]>();
     for (const a of legalForSelected) {
+      if (a.type === "LINE_COMMAND") continue; // kein Einzelziel-Feld
       const p = "to" in a ? a.to : a.target;
       const k = posKey(p);
       const arr = m.get(k);
@@ -170,6 +186,12 @@ export function App() {
                 {state.rules.rideCost} Bote) — Feld anklicken oder anders handeln.
               </span>
             )}
+            {lineCommands.map((lc, i) => (
+              <button key={i} className="btn line" onClick={() => apply(lc)}>
+                Linienbefehl {lc.unitIds.length}× ({lineLabel(state, lc.unitIds)}) ·{" "}
+                {lc.cost} Boten
+              </button>
+            ))}
           </div>
         </main>
 

@@ -2,6 +2,7 @@
 // Aktionsgenerierung und -anwendung. Herzstück der Regel-Engine (§4–§7).
 
 import {
+  COLS,
   createInitialState,
   enemyFortress,
   forwardDir,
@@ -18,6 +19,7 @@ import type {
   Action,
   CostedAction,
   GameState,
+  LineCommandAction,
   LogEntry,
   Position,
   Unit,
@@ -74,6 +76,8 @@ export function actionCost(state: GameState, unit: Unit, type: Action["type"]): 
       return r.shootCost;
     case "SHOOT_RIDE":
       return r.rideCost;
+    case "LINE_COMMAND":
+      return r.lineCommandCost;
     case "MARCH":
       if (unit.type === "INFANTRY") return r.pawnMoveCost;
       if (unit.type === "ARCHER") return r.archerMarchCost;
@@ -129,7 +133,11 @@ export function getLegalActions(state: GameState, unitId: string): CostedAction[
   };
 
   // 1) Schritt / Stoß — alle Einheiten, 1 Feld in jede Richtung (§5.1).
+  // V3: Infanterie darf nicht rückwärts (auch nicht diagonal-rückwärts).
+  const noBack = unit.type === "INFANTRY" && state.rules.pawnNoBackwardStep;
+  const fwd = forwardDir(unit.owner);
   for (const d of KING) {
+    if (noBack && d[1] === -fwd) continue; // rückwärtige Reihe verboten
     const to = add(unit.pos, d);
     if (!inBounds(to)) continue;
     const occU = occ.get(posKey(to));
@@ -149,6 +157,7 @@ export function getLegalActions(state: GameState, unitId: string): CostedAction[
   switch (unit.type) {
     case "INFANTRY":
       addPawnActions(state, unit, occ, push);
+      addLineCommands(state, unit, occ, push);
       break;
     case "LIGHT_CAV":
       addSlideActions(state, unit, occ, DIAG, push, state.rules.lightCavIgnoresBlockade);
@@ -231,6 +240,81 @@ function addPawnActions(
       });
     }
   }
+}
+
+// Linienbefehl (§6.7, V3): 2–4 horizontal benachbarte eigene Bauern ziehen
+// gleichzeitig 1 Feld vor. `unit` ist das linke Ende des Blocks; für jede
+// Blockgröße 2..max wird eine Aktion erzeugt (jeder Block genau einmal).
+function addLineCommands(
+  state: GameState,
+  unit: Unit,
+  occ: Map<string, Unit>,
+  push: (a: CostedAction) => void,
+) {
+  const r = state.rules;
+  if (!r.lineCommandEnabled) return;
+  const cost = r.lineCommandCost;
+  if (cost > state.messengers) return;
+
+  const fwd = forwardDir(unit.owner);
+  // Zusammenhängender Lauf eigener, noch nicht aktivierter Bauern nach rechts.
+  const run: Unit[] = [unit];
+  for (let c = unit.pos.col + 1; c < COLS; c++) {
+    const u = occ.get(posKey({ col: c, row: unit.pos.row }));
+    if (
+      u &&
+      u.owner === unit.owner &&
+      u.type === "INFANTRY" &&
+      !state.activatedUnitIds.includes(u.id)
+    ) {
+      run.push(u);
+    } else break;
+  }
+
+  const maxSize = Math.min(r.lineCommandMaxPawns, run.length);
+  for (let size = 2; size <= maxSize; size++) {
+    const group = run.slice(0, size);
+    const anyMovable = group.some((p) => {
+      const f = { col: p.pos.col, row: p.pos.row + fwd };
+      return inBounds(f) && !occ.has(posKey(f));
+    });
+    if (anyMovable) {
+      push({ type: "LINE_COMMAND", unitIds: group.map((p) => p.id), cost });
+    }
+  }
+}
+
+// --- Passive (§6.7, V3): Schildwall & Generals-Aura -------------------------
+
+/** Hat der Bauer einen eigenen Bauern direkt links oder rechts? */
+function pawnHasShieldWall(state: GameState, unit: Unit): boolean {
+  if (unit.type !== "INFANTRY") return false;
+  for (const dc of [-1, 1]) {
+    const n = unitAt(state, { col: unit.pos.col + dc, row: unit.pos.row });
+    if (n && n.owner === unit.owner && n.type === "INFANTRY") return true;
+  }
+  return false;
+}
+
+/** Steht die Einheit auf einem der 8 Felder um den eigenen König? */
+function hasGeneralAura(state: GameState, unit: Unit): boolean {
+  const general = Object.values(state.units).find(
+    (u) => u.type === "GENERAL" && u.owner === unit.owner,
+  );
+  if (!general) return false;
+  const dc = Math.abs(general.pos.col - unit.pos.col);
+  const dr = Math.abs(general.pos.row - unit.pos.row);
+  return Math.max(dc, dr) === 1;
+}
+
+/** Stoßschaden = max(1, 2 + Aura(+1) − Schildwall(−1)) (§5.1, §6.7). */
+function computePushDamage(state: GameState, attacker: Unit, target: Unit): number {
+  const r = state.rules;
+  let dmg = r.pushDamage;
+  if (r.generalAuraEnabled && hasGeneralAura(state, attacker)) dmg += r.generalAuraBonus;
+  if (r.shieldWallEnabled && pawnHasShieldWall(state, target))
+    dmg -= r.shieldWallReduction;
+  return Math.max(1, dmg);
 }
 
 // Gleitende Figuren (Läufer/Turm/Dame): Linien bis zur Blockade (§5.2).
@@ -349,10 +433,11 @@ function log(state: GameState, text: string) {
 
 function findLegal(
   state: GameState,
-  action: Exclude<Action, { type: "PASS" }>,
+  action: Exclude<Action, { type: "PASS" } | { type: "LINE_COMMAND" }>,
 ): CostedAction | undefined {
   const legal = getLegalActions(state, action.unitId);
   return legal.find((a) => {
+    if (a.type === "LINE_COMMAND") return false;
     if (a.type !== action.type || a.unitId !== action.unitId) return false;
     const aPos = "to" in a ? a.to : a.target;
     const bPos = "to" in action ? action.to : action.target;
@@ -369,6 +454,9 @@ export function applyAction(state: GameState, action: Action): GameState {
 
   if (action.type === "PASS") {
     return endTurn(state);
+  }
+  if (action.type === "LINE_COMMAND") {
+    return applyLineCommand(state, action);
   }
 
   const legal = findLegal(state, action);
@@ -401,7 +489,8 @@ export function applyAction(state: GameState, action: Action): GameState {
     }
     case "PUSH": {
       const target = next.units[unitIdAt(next, action.target)!];
-      target.hp -= next.rules.pushDamage;
+      const dmg = computePushDamage(next, unit, target); // §5.1/§6.7 Formel
+      target.hp -= dmg;
       let extra = "";
       if (target.hp <= 0) {
         removeUnit(next, target.id);
@@ -409,10 +498,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       }
       markActivated();
       clearRide();
-      log(
-        next,
-        `${sym(unit)} Stoß auf ${toAlgebraic(action.target)} (${next.rules.pushDamage} Schaden${extra})`,
-      );
+      log(next, `${sym(unit)} Stoß auf ${toAlgebraic(action.target)} (${dmg} Schaden${extra})`);
       break;
     }
     case "MARCH": {
@@ -424,19 +510,38 @@ export function applyAction(state: GameState, action: Action): GameState {
     }
     case "MARCH_ATTACK": {
       const target = next.units[unitIdAt(next, action.target)!];
-      const dmg =
-        unit.type === "GENERAL"
-          ? next.rules.generalMarchAttackDamage
-          : next.rules.marchAttackDamage;
-      target.hp -= dmg;
-      removeUnit(next, target.id); // 10 Schaden töten immer
-      moveUnit(unit, action.target); // nimmt das Feld ein
+      if (unit.type === "INFANTRY") {
+        // V3: Diagonalschlag 5 Schaden; nur bei Kill rückt der Bauer nach.
+        const dmg = next.rules.pawnDiagonalDamage;
+        target.hp -= dmg;
+        if (target.hp <= 0) {
+          removeUnit(next, target.id);
+          moveUnit(unit, action.target);
+          log(
+            next,
+            `${sym(unit)} Diagonalschlag auf ${toAlgebraic(action.target)} (${dmg} Schaden, tötet, rückt nach)`,
+          );
+        } else {
+          log(
+            next,
+            `${sym(unit)} Diagonalschlag auf ${toAlgebraic(action.target)} (${dmg} Schaden, Ziel überlebt)`,
+          );
+        }
+      } else {
+        const dmg =
+          unit.type === "GENERAL"
+            ? next.rules.generalMarchAttackDamage
+            : next.rules.marchAttackDamage;
+        target.hp -= dmg;
+        removeUnit(next, target.id); // 10 Schaden töten immer
+        moveUnit(unit, action.target); // nimmt das Feld ein
+        log(
+          next,
+          `${sym(unit)} Marschangriff auf ${toAlgebraic(action.target)} (${dmg} Schaden, tötet)`,
+        );
+      }
       markActivated();
       clearRide();
-      log(
-        next,
-        `${sym(unit)} Marschangriff auf ${toAlgebraic(action.target)} (${dmg} Schaden, tötet)`,
-      );
       break;
     }
     case "SHOOT": {
@@ -479,6 +584,40 @@ export function applyAction(state: GameState, action: Action): GameState {
 
   next.winner = checkVictory(next);
   return next;
+}
+
+// Linienbefehl (§6.7, V3): bewegt movable Bauern gleichzeitig 1 Feld vor.
+function applyLineCommand(state: GameState, action: LineCommandAction): GameState {
+  const anchor = action.unitIds[0];
+  const legal = getLegalActions(state, anchor).find(
+    (a) => a.type === "LINE_COMMAND" && sameIds(a.unitIds, action.unitIds),
+  );
+  if (!legal) throw new Error("Illegaler Linienbefehl.");
+
+  const next = cloneState(state);
+  next.messengers -= legal.cost;
+  const occ = occupancy(next); // Ursprungsbelegung (gleichzeitige Bewegung)
+  const owner = next.units[anchor].owner;
+  const fwd = forwardDir(owner);
+
+  let moved = 0;
+  for (const id of action.unitIds) {
+    const p = next.units[id];
+    const f = { col: p.pos.col, row: p.pos.row + fwd };
+    if (inBounds(f) && !occ.get(posKey(f))) {
+      moveUnit(p, f);
+      moved++;
+    }
+    if (!next.activatedUnitIds.includes(id)) next.activatedUnitIds.push(id);
+  }
+  next.pendingRide = null;
+  log(next, `Linienbefehl: ${action.unitIds.length} Bauern (${moved} ziehen vor)`);
+  next.winner = checkVictory(next);
+  return next;
+}
+
+function sameIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((x, i) => x === b[i]);
 }
 
 function moveUnit(unit: Unit, to: Position) {

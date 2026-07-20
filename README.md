@@ -68,17 +68,26 @@ Aktionstypen: `STEP`, `PUSH`, `MARCH`, `MARCH_ATTACK`, `SHOOT`, `SHOOT_RIDE`
   (Schuss + Nachritt zählen als eine Aktivierung).
 - **Zug beenden:** wechselt zum Gegner (Boten füllen auf, Festungs-Heilung).
 
-## Hausregeln (Abweichungen von SPEC.md)
+## Regelstand: Version 3
 
-Aus dem Playtest übernommen, als Flags in `rules.config.ts` gekapselt:
+Die aktuelle Regelbasis ist **SPEC.md Version 3** (siehe dortiges Changelog §0).
+Alle Regeln sind als Flags in `rules.config.ts` gekapselt:
 
-- **Brett auf 11 Reihen verkürzt** (Ur-Reihen 6 & 8 entfernt): Rot steht auf
-  Reihen 8–11 (Festung E11/F11), Blau auf 1–4 (Festung E1/F1), Niemandsland
-  sind die Reihen 5–7.
-- **Läufer zieht diagonal durch Figuren hindurch** (`lightCavIgnoresBlockade`):
-  Er überspringt eigene wie gegnerische Figuren, landet auf leeren Feldern oder
-  schlägt Gegner per Marschangriff — nur eigene Felder bleiben tabu. Turm und
-  Dame bleiben regulär blockiert.
+- **Brett 11 Reihen** (Ur-Reihen 6 & 8 entfernt): Rot 8–11 (Festung E11/F11),
+  Blau 1–4 (Festung E1/F1), Niemandsland 5–7.
+- **Läufer** zieht diagonal durch Figuren hindurch (`lightCavIgnoresBlockade`);
+  Turm/Dame bleiben blockiert.
+- **Bauern-Richtung** (`pawnNoBackwardStep`): Infanterie zieht/stößt nur
+  vorwärts, seitwärts, diagonal-vorwärts — kein Rückwärts.
+- **Diagonalschlag** (`pawnDiagonalDamage=5`): 5 statt 10 Schaden; nur bei Kill
+  rückt der Bauer nach. One-Hit-Kills bleiben Kavallerie/Dame/König & Schützen-Kombi.
+- **Linienbefehl** (`lineCommandEnabled`, 2 Boten): 2–4 horizontal benachbarte
+  Bauern ziehen gleichzeitig 1 Feld vor (nur freie Felder, kein Angriff).
+- **Schildwall** (`shieldWallEnabled`): Bauer mit eigenem Bauern links/rechts
+  erleidet aus Stößen 1 statt 2 Schaden.
+- **Generals-Aura** (`generalAuraEnabled`): eigene Einheit neben dem eigenen
+  König macht beim Stoß +1 Schaden.
+- **Stoßschaden-Formel:** `max(1, 2 + Aura(+1) − Schildwall(−1))`.
 
 ## Regel-Flags
 

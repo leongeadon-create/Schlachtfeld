@@ -37,6 +37,7 @@ export type ActionType =
   | "MARCH_ATTACK" //  Marschangriff: Schachmuster auf Gegner, 10 Schaden, nimmt Feld
   | "SHOOT" //         Schützen-Schuss: Springer-Muster, 5 Schaden, ignoriert Blockaden
   | "SHOOT_RIDE" //    Nachritt: +1 Bote, weitere 5 Schaden, nimmt Feld
+  | "LINE_COMMAND" //  Linienbefehl (V3): 2–4 Bauern je 1 Schritt vor
   | "PASS"; //         Zug beenden
 
 export interface StepAction {
@@ -69,6 +70,11 @@ export interface ShootRideAction {
   unitId: string;
   target: Position;
 }
+export interface LineCommandAction {
+  type: "LINE_COMMAND";
+  /** Beteiligte Bauern von links nach rechts (2–4). */
+  unitIds: string[];
+}
 export interface PassAction {
   type: "PASS";
 }
@@ -80,6 +86,7 @@ export type Action =
   | MarchAttackAction
   | ShootAction
   | ShootRideAction
+  | LineCommandAction
   | PassAction;
 
 /** Kosten (Boten) einer konkreten Aktion — von getLegalActions mitgeliefert. */

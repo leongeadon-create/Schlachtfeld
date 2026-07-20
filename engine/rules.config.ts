@@ -22,6 +22,23 @@ export interface RulesConfig {
   pawnMoveCost: number; // 1 Bote für alle Bauern-Schachzüge
   /** [ANNAHME §6.1] Bauern-Diagonalkill kostet nur pawnMoveCost (kosteneffizient, vom Autor gewollt). */
   cheapPawnDiagonalKill: boolean;
+  /** [V3] Infanterie zieht/stößt nur vorwärts, seitwärts, diagonal-vorwärts — kein Rückwärts. */
+  pawnNoBackwardStep: boolean;
+  /** [V3] Schaden des Bauern-Diagonalschlags (5); nur bei Kill rückt der Bauer nach. */
+  pawnDiagonalDamage: number;
+
+  // Linienbefehl (§6.7, V3)
+  lineCommandEnabled: boolean;
+  lineCommandCost: number; // 2 Boten
+  lineCommandMaxPawns: number; // 4
+
+  // Passive (§6.7, V3)
+  /** [V3] Schildwall: Bauer mit eigenem Bauern direkt links/rechts erleidet -1 aus Stößen. */
+  shieldWallEnabled: boolean;
+  shieldWallReduction: number; // 1
+  /** [V3] Generals-Aura: eigene Einheit auf einem der 8 Felder um den eigenen König: +1 beim Stoß. */
+  generalAuraEnabled: boolean;
+  generalAuraBonus: number; // 1
 
   // Berittene Bogenschützen (§6.2)
   shootCost: number; // 1 Bote
@@ -65,6 +82,17 @@ export const DEFAULT_RULES: RulesConfig = {
 
   pawnMoveCost: 1,
   cheapPawnDiagonalKill: true,
+  pawnNoBackwardStep: true,
+  pawnDiagonalDamage: 5,
+
+  lineCommandEnabled: true,
+  lineCommandCost: 2,
+  lineCommandMaxPawns: 4,
+
+  shieldWallEnabled: true,
+  shieldWallReduction: 1,
+  generalAuraEnabled: true,
+  generalAuraBonus: 1,
 
   shootCost: 1,
   shootDamage: 5,

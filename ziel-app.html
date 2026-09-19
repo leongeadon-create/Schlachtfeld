@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quest Log — Ziele & To-dos</title>
+    <meta name="description" content="Simple To-do/Ziel-App im dunklen Gaming-Look." />
+
+    <!--
+      ========================================================================
+      QUEST LOG — eine einzelne HTML-Datei (HTML + CSS + Vanilla JavaScript)
+      ========================================================================
+      Aufbau dieser Datei (von oben nach unten):
+        1. <style>  ... das gesamte CSS (Aussehen / dunkles Gaming-Theme)
+        2. <body>   ... die Struktur (Header, 3 Ansichten, Formular)
+        3. <script> ... die Logik (Daten, Speichern, Anzeigen, Ereignisse)
+
+      Für Einsteiger:
+        - "const"/"let" sind Variablen (const = unveränderbar, let = veränderbar).
+        - Eine "function" ist ein wiederverwendbarer Block Code.
+        - "document.querySelector(...)" holt ein HTML-Element per CSS-Auswahl.
+        - localStorage ist ein kleiner Speicher im Browser, der Neuladen übersteht.
+      ========================================================================
+    -->
+
+    <style>
+      /* ====================================================================
+         1) DESIGN-TOKENS ("Variablen" fürs Aussehen)
+         --------------------------------------------------------------------
+         In :root definieren wir Farben einmal zentral. Überall im CSS
+         schreiben wir dann z.B. var(--accent). Willst du die Akzentfarbe
+         ändern, änderst du nur diese eine Zeile.
+         ==================================================================== */
+      :root {
+        --bg:            #0d1117;  /* Seitenhintergrund (sehr dunkel) */
+        --surface:       #161b22;  /* Karten / Panels */
+        --surface-2:     #1c2230;  /* etwas hellere Fläche (Inputs) */
+        --border:        #2a3040;  /* dezente Ränder */
+        --text:          #e6edf3;  /* Haupttext (fast weiß) */
+        --text-dim:      #8b95a5;  /* abgeschwächter Text */
+        --accent:        #22d3ee;  /* Akzent 1: Cyan */
+        --accent-2:      #a855f7;  /* Akzent 2: Violett */
+        --danger:        #f87171;  /* Rot für Löschen / Warnungen */
+        --success:       #4ade80;  /* Grün für "erledigt" */
+        --radius:        12px;     /* Standard-Eckenrundung */
+        --shadow:        0 8px 24px rgba(0, 0, 0, 0.4);
+      }
+
+      /* Grund-Reset: einheitliches Box-Modell, Abstände zurücksetzen */
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.5;
+        /* leichter Farbverlauf im Hintergrund für "Gaming"-Stimmung */
+        background-image:
+          radial-gradient(900px 500px at 15% -10%, rgba(34, 211, 238, 0.08), transparent),
+          radial-gradient(900px 500px at 85% -10%, rgba(168, 85, 247, 0.10), transparent);
+        min-height: 100vh;
+      }
+
+      /* Zentrierter Inhaltsbereich, damit es auf großen Bildschirmen nicht
+         auseinanderfällt. 16px Innenabstand = Rand auch auf Handys. */
+      .wrap { max-width: 860px; margin: 0 auto; padding: 16px; }
+
+      /* ---- Kopfzeile mit Titel und Navigation --------------------------- */
+      header { padding: 20px 0 12px; }
+
+      .brand {
+        display: flex; align-items: center; gap: 10px;
+        font-size: 1.6rem; font-weight: 800; letter-spacing: 0.5px;
+      }
+      .brand .logo { font-size: 1.8rem; }
+      /* Farbverlauf-Text für den Titel (Cyan -> Violett) */
+      .brand .title {
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        -webkit-background-clip: text; background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .brand .sub { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; }
+
+      /* ---- Tab-Navigation (Dashboard / Alle / Neu) ---------------------- */
+      nav.tabs { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+      .tab {
+        background: var(--surface); color: var(--text-dim);
+        border: 1px solid var(--border); border-radius: 999px;
+        padding: 8px 16px; font-size: 0.9rem; font-weight: 600;
+        cursor: pointer; transition: all 0.15s ease;
+      }
+      .tab:hover { color: var(--text); border-color: var(--accent); }
+      /* aktiver Tab wird hervorgehoben */
+      .tab.active {
+        color: #041014; border-color: transparent;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      }
+
+      /* ====================================================================
+         2) KARTEN / ALLGEMEINE BAUSTEINE
+         ==================================================================== */
+      .panel {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 18px; margin-top: 16px;
+        box-shadow: var(--shadow);
+      }
+      .panel h2 { font-size: 1.05rem; margin-bottom: 4px; }
+      .panel .hint { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; }
+
+      /* Kleiner Trick: Ansichten, die nicht aktiv sind, blenden wir aus.
+         Über .hidden schalten wir per JavaScript um. */
+      .hidden { display: none !important; }
+
+      /* ---- Statistik-Kacheln (offen / erledigt) ------------------------- */
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .stat {
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 14px; text-align: center;
+      }
+      .stat .num { font-size: 1.8rem; font-weight: 800; }
+      .stat .lbl { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+      .stat.open .num  { color: var(--accent); }
+      .stat.done .num  { color: var(--success); }
+      .stat.total .num { color: var(--accent-2); }
+
+      /* ---- XP-Balken-Optik: zeigt Fortschritt "erledigt / gesamt" ------- */
+      .xp { margin-top: 14px; }
+      .xp .xp-label {
+        display: flex; justify-content: space-between;
+        font-size: 0.8rem; color: var(--text-dim); margin-bottom: 6px;
+      }
+      .xp .bar {
+        height: 14px; background: var(--surface-2);
+        border: 1px solid var(--border); border-radius: 999px; overflow: hidden;
+      }
+      .xp .fill {
+        height: 100%; width: 0%;                 /* wird per JS gesetzt */
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        border-radius: 999px; transition: width 0.4s ease;
+        box-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
+      }
+
+      /* ====================================================================
+         3) EINTRAGS-LISTE
+         ==================================================================== */
+      .entry {
+        display: flex; align-items: flex-start; gap: 12px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 12px 14px; margin-top: 10px;
+      }
+      /* farbiger Streifen links = visuelle Kategorie-Markierung */
+      .entry { border-left: 4px solid var(--border); }
+      .entry.cat-alltag { border-left-color: var(--accent); }
+      .entry.cat-skill  { border-left-color: var(--accent-2); }
+      .entry.cat-ziel   { border-left-color: #fbbf24; }
+
+      .entry .check {
+        flex: 0 0 auto; width: 26px; height: 26px; margin-top: 2px;
+        border-radius: 8px; border: 2px solid var(--border);
+        background: transparent; cursor: pointer; font-size: 0.9rem;
+        color: var(--success); display: grid; place-items: center;
+      }
+      .entry .check:hover { border-color: var(--success); }
+      .entry .body { flex: 1 1 auto; min-width: 0; }
+      .entry .row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .entry .name { font-weight: 700; }
+      /* erledigte Einträge werden durchgestrichen und abgedunkelt */
+      .entry.is-done .name { text-decoration: line-through; color: var(--text-dim); }
+
+      /* kleine Etiketten ("Badges") für Kategorie und Deadline */
+      .badge {
+        font-size: 0.72rem; font-weight: 600; padding: 2px 8px;
+        border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
+      }
+      .badge.cat-alltag { color: var(--accent); border-color: var(--accent); }
+      .badge.cat-skill  { color: var(--accent-2); border-color: var(--accent-2); }
+      .badge.cat-ziel   { color: #fbbf24; border-color: #fbbf24; }
+      .badge.due-today  { color: #041014; background: var(--accent); border-color: transparent; }
+      .badge.overdue    { color: #2a0000; background: var(--danger); border-color: transparent; }
+
+      .entry .note { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; white-space: pre-wrap; }
+      .entry .meta { color: var(--text-dim); font-size: 0.75rem; margin-top: 4px; }
+
+      /* Aktionsknöpfe (Bearbeiten / Löschen) rechts im Eintrag */
+      .entry .actions { flex: 0 0 auto; display: flex; gap: 6px; }
+      .icon-btn {
+        background: transparent; border: 1px solid var(--border);
+        border-radius: 8px; padding: 6px 8px; cursor: pointer; font-size: 0.9rem;
+        color: var(--text-dim);
+      }
+      .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+      .icon-btn.del:hover { color: var(--danger); border-color: var(--danger); }
+
+      /* Text, wenn eine Liste leer ist */
+      .empty { color: var(--text-dim); font-size: 0.9rem; padding: 8px 2px; }
+
+      /* ====================================================================
+         4) FILTER-LEISTE (nach Kategorie)
+         ==================================================================== */
+      .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+      .filter {
+        background: var(--surface-2); border: 1px solid var(--border);
+        color: var(--text-dim); border-radius: 999px; padding: 6px 12px;
+        font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      }
+      .filter.active { color: var(--text); border-color: var(--accent); background: rgba(34,211,238,0.1); }
+
+      /* ====================================================================
+         5) FORMULAR
+         ==================================================================== */
+      .field { margin-top: 12px; }
+      .field label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
+      .field input, .field select, .field textarea {
+        width: 100%; background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 10px 12px; font-size: 0.95rem; font-family: inherit;
+      }
+      .field input:focus, .field select:focus, .field textarea:focus {
+        outline: none; border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+      }
+      .field textarea { resize: vertical; min-height: 70px; }
+
+      /* Knöpfe unter dem Formular */
+      .form-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+      .btn {
+        border: none; border-radius: 10px; padding: 11px 18px;
+        font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      }
+      .btn.primary {
+        color: #041014;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      }
+      .btn.primary:hover { filter: brightness(1.1); }
+      .btn.ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+      .btn.ghost:hover { border-color: var(--accent); }
+
+      /* Auf schmalen Bildschirmen die 3 Statistik-Kacheln enger stapeln */
+      @media (max-width: 520px) {
+        .stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .stat .num { font-size: 1.4rem; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <!-- ================================================================
+           KOPFZEILE + NAVIGATION
+           ================================================================ -->
+      <header>
+        <div class="brand">
+          <span class="logo">🎮</span>
+          <div>
+            <div class="title">QUEST LOG</div>
+            <div class="sub">Deine Ziele &amp; To-dos</div>
+          </div>
+        </div>
+
+        <!-- Die Tabs schalten zwischen den 3 Ansichten um.
+             data-view verweist auf die passende Ansicht unten. -->
+        <nav class="tabs">
+          <button class="tab active" data-view="dashboard">📊 Dashboard</button>
+          <button class="tab" data-view="all">📋 Alle Einträge</button>
+          <button class="tab" data-view="form">➕ Neuer Eintrag</button>
+        </nav>
+      </header>
+
+      <!-- ================================================================
+           ANSICHT 1: DASHBOARD
+           ================================================================ -->
+      <section id="view-dashboard">
+        <!-- Statistik-Kacheln + XP-Balken -->
+        <div class="panel">
+          <h2>Übersicht</h2>
+          <p class="hint">Dein Fortschritt auf einen Blick.</p>
+
+          <div class="stats">
+            <div class="stat open">
+              <div class="num" id="stat-open">0</div>
+              <div class="lbl">Offen</div>
+            </div>
+            <div class="stat done">
+              <div class="num" id="stat-done">0</div>
+              <div class="lbl">Erledigt</div>
+            </div>
+            <div class="stat total">
+              <div class="num" id="stat-total">0</div>
+              <div class="lbl">Gesamt</div>
+            </div>
+          </div>
+
+          <!-- XP-Balken: Anteil erledigter Einträge -->
+          <div class="xp">
+            <div class="xp-label">
+              <span>Fortschritt</span>
+              <span id="xp-text">0 / 0</span>
+            </div>
+            <div class="bar"><div class="fill" id="xp-fill"></div></div>
+          </div>
+        </div>
+
+        <!-- Heute fällig -->
+        <div class="panel">
+          <h2>🔥 Heute fällig</h2>
+          <p class="hint">Einträge mit Deadline heute (noch offen).</p>
+          <div id="due-today"></div>
+        </div>
+
+        <!-- Diese Woche fällig -->
+        <div class="panel">
+          <h2>🗓️ Diese Woche fällig</h2>
+          <p class="hint">Offene Einträge mit Deadline in den nächsten 7 Tagen.</p>
+          <div id="due-week"></div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT 2: ALLE EINTRÄGE (mit Kategorie-Filter)
+           ================================================================ -->
+      <section id="view-all" class="hidden">
+        <div class="panel">
+          <h2>Alle Einträge</h2>
+          <p class="hint">Filtere nach Kategorie.</p>
+
+          <!-- Filter-Knöpfe. data-filter = welche Kategorie gezeigt wird. -->
+          <div class="filters">
+            <button class="filter active" data-filter="all">Alle</button>
+            <button class="filter" data-filter="alltag">🏠 Alltag</button>
+            <button class="filter" data-filter="skill">🎯 Skill</button>
+            <button class="filter" data-filter="ziel">🏆 Langfristiges Ziel</button>
+          </div>
+
+          <!-- Hierhin schreibt JavaScript die gefilterte Liste -->
+          <div id="all-list"></div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT 3: FORMULAR (neuer Eintrag ODER bearbeiten)
+           ================================================================ -->
+      <section id="view-form" class="hidden">
+        <div class="panel">
+          <!-- Diese Überschrift wechselt je nach "neu" / "bearbeiten" -->
+          <h2 id="form-title">Neuer Eintrag</h2>
+          <p class="hint">Fülle die Felder aus. Nur der Titel ist Pflicht.</p>
+
+          <!-- Unsichtbares Feld: merkt sich, welchen Eintrag wir bearbeiten.
+               Leer = wir erstellen einen neuen Eintrag. -->
+          <input type="hidden" id="f-id" />
+
+          <div class="field">
+            <label for="f-title">Titel *</label>
+            <input type="text" id="f-title" placeholder="z. B. 30 Min Gitarre üben" />
+          </div>
+
+          <div class="field">
+            <label for="f-category">Kategorie</label>
+            <select id="f-category">
+              <option value="alltag">🏠 Alltag</option>
+              <option value="skill">🎯 Skill</option>
+              <option value="ziel">🏆 Langfristiges Ziel</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-deadline">Deadline (optional)</label>
+            <input type="date" id="f-deadline" />
+          </div>
+
+          <div class="field">
+            <label for="f-note">Notiz (optional)</label>
+            <textarea id="f-note" placeholder="Freitext, Details, Gedanken ..."></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="f-save">💾 Speichern</button>
+            <button class="btn ghost" id="f-cancel">Abbrechen</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      /* ====================================================================
+         JAVASCRIPT — die Logik der App
+         --------------------------------------------------------------------
+         Ablauf:
+           A) Daten laden (aus localStorage) oder leere Liste starten
+           B) Funktionen zum Speichern, Anzeigen, Erstellen, Bearbeiten, Löschen
+           C) Ereignisse (Klicks) mit Funktionen verbinden
+           D) Erste Anzeige aufbauen
+         ==================================================================== */
+
+      /* --------------------------------------------------------------------
+         A) DATENMODELL & SPEICHER
+         --------------------------------------------------------------------
+         Jeder Eintrag ist ein Objekt mit diesen Feldern:
+
+           {
+             id:         "eindeutige-id",     // damit wir Einträge wiederfinden
+             title:      "Text",              // Titel
+             category:   "alltag"|"skill"|"ziel",
+             deadline:   "2026-09-30" | null, // Datum als Text (ISO) oder null
+             status:     "offen" | "erledigt",
+             createdAt:  "2026-09-19T10:00:00.000Z", // automatisch beim Anlegen
+             note:       "Freitext",
+             skillData:  null                 // <-- VORBEREITUNG FÜR SPÄTER
+           }
+
+         WICHTIG (Vorbereitung für später):
+         Das Feld "skillData" ist bewusst schon vorhanden, bleibt aber vorerst
+         null. Später kannst du es für Skill-Einträge mit einem Objekt füllen,
+         z. B.:
+           skillData: {
+             milestones:  [ { title: "...", done: false } ],   // Meilensteine
+             practiceLog: [ { date: "...", minutes: 30, note: "" } ] // Übungs-Log
+           }
+         Weil das Feld schon Teil jedes Eintrags ist, musst du das Datenmodell
+         später NICHT umbauen — du füllst "skillData" einfach mit Leben.
+         -------------------------------------------------------------------- */
+
+      // Schlüssel, unter dem wir im Browser speichern.
+      const STORAGE_KEY = "questlog.entries.v1";
+
+      // "entries" ist unsere Liste aller Einträge (ein Array von Objekten).
+      let entries = loadEntries();
+
+      // Merkt sich den aktuell gewählten Kategorie-Filter in Ansicht 2.
+      let activeFilter = "all";
+
+      // Liest die gespeicherten Einträge aus localStorage.
+      // Falls nichts gespeichert ist oder etwas kaputt ist, geben wir [] zurück.
+      function loadEntries() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          // Sicherheitsnetz: nur ein Array akzeptieren
+          return Array.isArray(data) ? data : [];
+        } catch (err) {
+          console.warn("Konnte Daten nicht laden:", err);
+          return [];
+        }
+      }
+
+      // Schreibt die aktuelle Liste zurück in localStorage.
+      // JSON.stringify wandelt unsere Objekte in Text um (nur Text lässt sich speichern).
+      function saveEntries() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+        } catch (err) {
+          console.warn("Konnte Daten nicht speichern:", err);
+        }
+      }
+
+      // Erzeugt eine einfache, ausreichend eindeutige ID.
+      function makeId() {
+        return "id-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+      }
+
+      /* --------------------------------------------------------------------
+         DATUMS-HILFEN
+         Wir vergleichen Datumsangaben als reine "YYYY-MM-DD"-Texte. Das ist
+         einfach und vermeidet Verwirrung mit Uhrzeiten/Zeitzonen.
+         -------------------------------------------------------------------- */
+
+      // Gibt das heutige Datum als "YYYY-MM-DD" zurück (lokale Zeit).
+      function todayISO() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0"); // Monat 0-basiert -> +1
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      // Gibt das Datum in "n" Tagen als "YYYY-MM-DD" zurück (z. B. +7 Tage).
+      function isoInDays(n) {
+        const d = new Date();
+        d.setDate(d.getDate() + n);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      /* --------------------------------------------------------------------
+         B) ANZEIGE ("Rendering")
+         Diese Funktionen bauen aus den Daten den sichtbaren HTML-Inhalt.
+         "render()" ist der zentrale Aufruf: er baut alle Ansichten neu.
+         -------------------------------------------------------------------- */
+
+      function render() {
+        renderDashboard();
+        renderAllList();
+      }
+
+      // Baut Statistik-Kacheln, XP-Balken und die beiden Fällig-Listen.
+      function renderDashboard() {
+        const total = entries.length;
+        const doneCount = entries.filter((e) => e.status === "erledigt").length;
+        const openCount = total - doneCount;
+
+        // Kachel-Zahlen setzen
+        document.getElementById("stat-open").textContent = openCount;
+        document.getElementById("stat-done").textContent = doneCount;
+        document.getElementById("stat-total").textContent = total;
+
+        // XP-Balken: Anteil erledigt (in Prozent). Bei 0 Einträgen -> 0 %.
+        const percent = total === 0 ? 0 : Math.round((doneCount / total) * 100);
+        document.getElementById("xp-fill").style.width = percent + "%";
+        document.getElementById("xp-text").textContent = `${doneCount} / ${total} (${percent}%)`;
+
+        // "Heute fällig": offen UND Deadline == heute
+        const today = todayISO();
+        const dueToday = entries.filter(
+          (e) => e.status === "offen" && e.deadline === today
+        );
+
+        // "Diese Woche fällig": offen UND Deadline zwischen heute und heute+7
+        const weekEnd = isoInDays(7);
+        const dueWeek = entries.filter(
+          (e) =>
+            e.status === "offen" &&
+            e.deadline &&                 // Deadline gesetzt
+            e.deadline >= today &&        // ab heute
+            e.deadline <= weekEnd         // bis in 7 Tagen
+        );
+        // Innerhalb der Woche nach Datum sortieren (nächste zuerst).
+        dueWeek.sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+        // In die Container schreiben. Sind sie leer, zeigen wir einen Hinweis.
+        renderInto("due-today", dueToday, "Heute ist nichts fällig. 🎉");
+        renderInto("due-week", dueWeek, "Diese Woche steht nichts an.");
+      }
+
+      // Baut die Liste in Ansicht 2, gefiltert nach der gewählten Kategorie.
+      function renderAllList() {
+        let list = entries;
+        if (activeFilter !== "all") {
+          list = entries.filter((e) => e.category === activeFilter);
+        }
+        // Neueste zuerst: nach Erstellungsdatum absteigend sortieren.
+        // slice() erzeugt eine Kopie, damit wir das Original nicht verändern.
+        list = list.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+        renderInto("all-list", list, "Keine Einträge in dieser Kategorie.");
+      }
+
+      // Hilfsfunktion: schreibt eine Liste von Einträgen in einen Container.
+      // containerId = ID des Ziel-Elements, list = Einträge, emptyText = Text bei leer.
+      function renderInto(containerId, list, emptyText) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = ""; // erst leeren
+
+        if (list.length === 0) {
+          container.innerHTML = `<div class="empty">${emptyText}</div>`;
+          return;
+        }
+
+        // Für jeden Eintrag ein HTML-Element bauen und anhängen.
+        list.forEach((entry) => {
+          container.appendChild(buildEntryElement(entry));
+        });
+      }
+
+      // Baut das HTML-Element für EINEN Eintrag (Karte mit Check, Text, Knöpfen).
+      function buildEntryElement(entry) {
+        const isDone = entry.status === "erledigt";
+
+        // Lesbare Kategorie-Namen + Icons
+        const catInfo = {
+          alltag: { label: "Alltag", icon: "🏠" },
+          skill:  { label: "Skill", icon: "🎯" },
+          ziel:   { label: "Langfristiges Ziel", icon: "🏆" },
+        }[entry.category] || { label: entry.category, icon: "•" };
+
+        // Deadline-Badge vorbereiten (überfällig / heute / normales Datum).
+        let deadlineBadge = "";
+        if (entry.deadline) {
+          const today = todayISO();
+          if (!isDone && entry.deadline < today) {
+            deadlineBadge = `<span class="badge overdue">⚠️ überfällig: ${formatDate(entry.deadline)}</span>`;
+          } else if (!isDone && entry.deadline === today) {
+            deadlineBadge = `<span class="badge due-today">🔥 heute</span>`;
+          } else {
+            deadlineBadge = `<span class="badge">📅 ${formatDate(entry.deadline)}</span>`;
+          }
+        }
+
+        // Notiz nur anzeigen, wenn vorhanden.
+        const noteHtml = entry.note
+          ? `<div class="note">${escapeHtml(entry.note)}</div>`
+          : "";
+
+        // Das äußere Karten-Element erstellen.
+        const el = document.createElement("div");
+        el.className =
+          "entry cat-" + entry.category + (isDone ? " is-done" : "");
+
+        // Inhalt der Karte. escapeHtml() schützt vor kaputtem/gefährlichem Text.
+        el.innerHTML = `
+          <button class="check" title="Als erledigt/offen umschalten">
+            ${isDone ? "✓" : ""}
+          </button>
+          <div class="body">
+            <div class="row1">
+              <span class="name">${escapeHtml(entry.title)}</span>
+              <span class="badge cat-${entry.category}">${catInfo.icon} ${catInfo.label}</span>
+              ${deadlineBadge}
+            </div>
+            ${noteHtml}
+            <div class="meta">Erstellt am ${formatDate(entry.createdAt)}</div>
+          </div>
+          <div class="actions">
+            <button class="icon-btn edit" title="Bearbeiten">✏️</button>
+            <button class="icon-btn del" title="Löschen">🗑️</button>
+          </div>
+        `;
+
+        // Ereignisse dieser Karte verbinden (Check / Bearbeiten / Löschen).
+        el.querySelector(".check").addEventListener("click", () => toggleDone(entry.id));
+        el.querySelector(".edit").addEventListener("click", () => startEdit(entry.id));
+        el.querySelector(".del").addEventListener("click", () => deleteEntry(entry.id));
+
+        return el;
+      }
+
+      // Wandelt "2026-09-19" bzw. ISO-Zeit in ein hübsches deutsches Datum um.
+      function formatDate(value) {
+        const d = new Date(value);
+        if (isNaN(d)) return value; // Notfall: unverändert zurückgeben
+        return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      }
+
+      // Sicherheit: ersetzt Sonderzeichen, damit Nutzertext nicht als HTML wirkt.
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      /* --------------------------------------------------------------------
+         AKTIONEN: erstellen, bearbeiten, löschen, erledigt-umschalten
+         -------------------------------------------------------------------- */
+
+      // Speichert das Formular: entweder neuer Eintrag oder Änderung.
+      function saveForm() {
+        const id = document.getElementById("f-id").value;          // leer = neu
+        const title = document.getElementById("f-title").value.trim();
+        const category = document.getElementById("f-category").value;
+        const deadline = document.getElementById("f-deadline").value || null; // "" -> null
+        const note = document.getElementById("f-note").value.trim();
+
+        // Titel ist Pflicht. Ohne Titel: kurze Rückmeldung, nichts speichern.
+        if (!title) {
+          alert("Bitte gib einen Titel ein.");
+          return;
+        }
+
+        if (id) {
+          // --- BEARBEITEN: vorhandenen Eintrag finden und Felder aktualisieren ---
+          const entry = entries.find((e) => e.id === id);
+          if (entry) {
+            entry.title = title;
+            entry.category = category;
+            entry.deadline = deadline;
+            entry.note = note;
+            // status, createdAt und skillData bleiben unverändert erhalten.
+          }
+        } else {
+          // --- NEU: ein frisches Eintrags-Objekt anlegen ---
+          entries.push({
+            id: makeId(),
+            title: title,
+            category: category,
+            deadline: deadline,
+            status: "offen",                 // neue Einträge starten als "offen"
+            createdAt: new Date().toISOString(), // automatischer Zeitstempel
+            note: note,
+            skillData: null,                 // Platzhalter für spätere Skill-Logik
+          });
+        }
+
+        saveEntries(); // in localStorage sichern
+        resetForm();   // Formular leeren
+        render();      // Anzeige aktualisieren
+        switchView("all"); // nach dem Speichern zur Liste wechseln
+      }
+
+      // Öffnet das Formular vorbefüllt, um einen bestehenden Eintrag zu ändern.
+      function startEdit(id) {
+        const entry = entries.find((e) => e.id === id);
+        if (!entry) return;
+
+        document.getElementById("f-id").value = entry.id;
+        document.getElementById("f-title").value = entry.title;
+        document.getElementById("f-category").value = entry.category;
+        document.getElementById("f-deadline").value = entry.deadline || "";
+        document.getElementById("f-note").value = entry.note || "";
+        document.getElementById("form-title").textContent = "Eintrag bearbeiten";
+
+        switchView("form");
+      }
+
+      // Löscht einen Eintrag (mit Sicherheitsabfrage).
+      function deleteEntry(id) {
+        const entry = entries.find((e) => e.id === id);
+        if (!entry) return;
+        if (!confirm(`„${entry.title}" wirklich löschen?`)) return;
+
+        // filter() behält alle Einträge, deren id NICHT die gesuchte ist.
+        entries = entries.filter((e) => e.id !== id);
+        saveEntries();
+        render();
+      }
+
+      // Schaltet einen Eintrag zwischen "offen" und "erledigt" um.
+      function toggleDone(id) {
+        const entry = entries.find((e) => e.id === id);
+        if (!entry) return;
+        entry.status = entry.status === "erledigt" ? "offen" : "erledigt";
+        saveEntries();
+        render();
+      }
+
+      // Setzt das Formular auf den Ausgangszustand (leer, "neuer Eintrag").
+      function resetForm() {
+        document.getElementById("f-id").value = "";
+        document.getElementById("f-title").value = "";
+        document.getElementById("f-category").value = "alltag";
+        document.getElementById("f-deadline").value = "";
+        document.getElementById("f-note").value = "";
+        document.getElementById("form-title").textContent = "Neuer Eintrag";
+      }
+
+      /* --------------------------------------------------------------------
+         ANSICHTS-WECHSEL (Tabs)
+         -------------------------------------------------------------------- */
+
+      // Zeigt genau eine Ansicht und markiert den passenden Tab.
+      function switchView(view) {
+        // Alle Ansichten ausblenden, gewünschte einblenden.
+        document.getElementById("view-dashboard").classList.toggle("hidden", view !== "dashboard");
+        document.getElementById("view-all").classList.toggle("hidden", view !== "all");
+        document.getElementById("view-form").classList.toggle("hidden", view !== "form");
+
+        // Aktiven Tab markieren.
+        document.querySelectorAll(".tab").forEach((tab) => {
+          tab.classList.toggle("active", tab.dataset.view === view);
+        });
+
+        // Beim Verlassen des Formulars setzen wir es zurück,
+        // damit ein danach geklicktes "Neuer Eintrag" wirklich leer ist.
+        if (view !== "form") resetForm();
+      }
+
+      /* --------------------------------------------------------------------
+         C) EREIGNISSE VERBINDEN (Klicks etc.)
+         -------------------------------------------------------------------- */
+
+      // Tab-Klicks: zur jeweiligen Ansicht wechseln.
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => switchView(tab.dataset.view));
+      });
+
+      // Filter-Klicks in Ansicht 2: Kategorie setzen und Liste neu bauen.
+      document.querySelectorAll(".filter").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeFilter = btn.dataset.filter;
+          // aktiven Filter-Knopf hervorheben
+          document.querySelectorAll(".filter").forEach((b) =>
+            b.classList.toggle("active", b === btn)
+          );
+          renderAllList();
+        });
+      });
+
+      // Formular-Knöpfe.
+      document.getElementById("f-save").addEventListener("click", saveForm);
+      document.getElementById("f-cancel").addEventListener("click", () => {
+        resetForm();
+        switchView("all");
+      });
+
+      // Komfort: im Titelfeld mit Enter direkt speichern.
+      document.getElementById("f-title").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") saveForm();
+      });
+
+      /* --------------------------------------------------------------------
+         D) START: erste Anzeige aufbauen
+         -------------------------------------------------------------------- */
+      render();
+    </script>
+  </body>
+</html>

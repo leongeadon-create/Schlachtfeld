@@ -235,6 +235,81 @@
       .btn.ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
       .btn.ghost:hover { border-color: var(--accent); }
 
+      /* ====================================================================
+         6) SKILLS (neu ergänzt — verändert nichts am Bestehenden)
+         Wir nutzen dieselben Design-Tokens (Farben) wie oben, damit der
+         Look konsistent bleibt.
+         ==================================================================== */
+      .skill-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-left: 4px solid var(--accent-2);   /* violetter Skill-Streifen */
+        border-radius: var(--radius); padding: 16px; margin-top: 12px;
+        box-shadow: var(--shadow);
+      }
+      .skill-head { display: flex; align-items: flex-start; gap: 10px; }
+      .skill-head > div:first-child { flex: 1 1 auto; min-width: 0; }
+      .skill-name { font-size: 1.1rem; font-weight: 800; }
+      .skill-dir { color: var(--text-dim); font-size: 0.85rem; margin-top: 2px; white-space: pre-wrap; }
+
+      /* Level-Badge + XP-Balken nebeneinander */
+      .level-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+      .level-badge {
+        flex: 0 0 auto; font-weight: 800; font-size: 0.8rem; color: #041014;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        padding: 5px 11px; border-radius: 999px; box-shadow: 0 0 12px rgba(168,85,247,0.4);
+      }
+      .level-row .xp { margin: 0; flex: 1 1 auto; }  /* .xp/.bar/.fill werden oben schon gestylt */
+
+      /* Meilenstein-Liste */
+      .ms-list { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+      .ms-item { display: flex; align-items: center; gap: 8px; }
+      .ms-check {
+        width: 22px; height: 22px; flex: 0 0 auto; border-radius: 6px;
+        border: 2px solid var(--border); background: transparent; cursor: pointer;
+        color: var(--success); display: grid; place-items: center; font-size: 0.8rem;
+      }
+      .ms-check:hover { border-color: var(--success); }
+      .ms-title { flex: 1 1 auto; font-size: 0.9rem; }
+      .ms-item.done .ms-title { text-decoration: line-through; color: var(--text-dim); }
+      .ms-del {
+        flex: 0 0 auto; background: transparent; border: none; color: var(--text-dim);
+        cursor: pointer; font-size: 0.9rem;
+      }
+      .ms-del:hover { color: var(--danger); }
+
+      /* Zeile zum Hinzufügen eines Meilensteins */
+      .ms-add { display: flex; gap: 6px; margin-top: 10px; }
+      .ms-add input {
+        flex: 1 1 auto; background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 0.85rem;
+      }
+      .ms-add input:focus { outline: none; border-color: var(--accent-2); }
+      .ms-add button {
+        flex: 0 0 auto; background: var(--surface-2); color: var(--text-dim);
+        border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px;
+        cursor: pointer; font-weight: 700;
+      }
+      .ms-add button:hover { color: var(--text); border-color: var(--accent-2); }
+
+      /* Aktionen + Übungseinheit-Button */
+      .skill-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      .unit-btn {
+        background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #041014;
+        border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer;
+      }
+      .unit-btn:hover { filter: brightness(1.1); }
+      .unit-count { color: var(--text-dim); font-size: 0.85rem; }
+
+      /* Kleine Historie der letzten Einheiten */
+      .history { margin-top: 14px; }
+      .history .h-title { color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+      .history .h-item {
+        display: inline-block; font-size: 0.78rem; color: var(--text);
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 3px 9px; margin: 0 6px 6px 0;
+      }
+      .history .h-empty { color: var(--text-dim); font-size: 0.82rem; }
+
       /* Auf schmalen Bildschirmen die 3 Statistik-Kacheln enger stapeln */
       @media (max-width: 520px) {
         .stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -262,6 +337,7 @@
         <nav class="tabs">
           <button class="tab active" data-view="dashboard">📊 Dashboard</button>
           <button class="tab" data-view="all">📋 Alle Einträge</button>
+          <button class="tab" data-view="skills">🧠 Skills</button>
           <button class="tab" data-view="form">➕ Neuer Eintrag</button>
         </nav>
       </header>
@@ -334,6 +410,48 @@
           <!-- Hierhin schreibt JavaScript die gefilterte Liste -->
           <div id="all-list"></div>
         </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT: SKILLS (neu ergänzt)
+           ================================================================ -->
+      <section id="view-skills" class="hidden">
+        <div class="panel">
+          <h2>🧠 Skills</h2>
+          <p class="hint">Baue Fähigkeiten auf, sammle XP und steige im Level.</p>
+          <button class="btn primary" id="sk-new-btn">➕ Neuer Skill</button>
+        </div>
+
+        <!-- Formular für einen neuen Skill (versteckt bis "Neuer Skill") -->
+        <div class="panel hidden" id="sk-form-panel">
+          <h2>Neuer Skill</h2>
+          <p class="hint">Nur der Name ist Pflicht. Meilensteine kannst du auch später je Karte ergänzen.</p>
+
+          <div class="field">
+            <label for="sk-name">Name *</label>
+            <input type="text" id="sk-name" placeholder="z. B. Liegestütze" />
+          </div>
+
+          <div class="field">
+            <label for="sk-direction">Richtung / Notiz</label>
+            <textarea id="sk-direction" placeholder="z. B. Kraft aufbauen Richtung 100 Liegestütze"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Erste Meilensteine (optional, bis zu 3)</label>
+            <input type="text" class="sk-ms-input" placeholder="Meilenstein 1 (z. B. 20 am Stück)" style="margin-bottom: 8px" />
+            <input type="text" class="sk-ms-input" placeholder="Meilenstein 2 (z. B. 50 am Stück)" style="margin-bottom: 8px" />
+            <input type="text" class="sk-ms-input" placeholder="Meilenstein 3 (z. B. 100 am Stück)" />
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="sk-save">💾 Skill erstellen</button>
+            <button class="btn ghost" id="sk-cancel">Abbrechen</button>
+          </div>
+        </div>
+
+        <!-- Hierhin schreibt JavaScript die Skill-Karten -->
+        <div id="sk-list"></div>
       </section>
 
       <!-- ================================================================
@@ -426,6 +544,11 @@
       // "entries" ist unsere Liste aller Einträge (ein Array von Objekten).
       let entries = loadEntries();
 
+      // "skills" ist ein EIGENES Array neben "entries" (siehe Skills-Block unten).
+      // loadSkills() ist weiter unten definiert, funktioniert hier aber schon,
+      // weil Funktions-Deklarationen in JavaScript "nach oben gezogen" werden.
+      let skills = loadSkills();
+
       // Merkt sich den aktuell gewählten Kategorie-Filter in Ansicht 2.
       let activeFilter = "all";
 
@@ -493,6 +616,7 @@
       function render() {
         renderDashboard();
         renderAllList();
+        renderSkills(); // neu: Skill-Karten mitzeichnen
       }
 
       // Baut Statistik-Kacheln, XP-Balken und die beiden Fällig-Listen.
@@ -743,6 +867,7 @@
         // Alle Ansichten ausblenden, gewünschte einblenden.
         document.getElementById("view-dashboard").classList.toggle("hidden", view !== "dashboard");
         document.getElementById("view-all").classList.toggle("hidden", view !== "all");
+        document.getElementById("view-skills").classList.toggle("hidden", view !== "skills");
         document.getElementById("view-form").classList.toggle("hidden", view !== "form");
 
         // Aktiven Tab markieren.
@@ -753,6 +878,8 @@
         // Beim Verlassen des Formulars setzen wir es zurück,
         // damit ein danach geklicktes "Neuer Eintrag" wirklich leer ist.
         if (view !== "form") resetForm();
+        // Verlassen wir die Skills-Ansicht, klappen wir das Skill-Formular zu.
+        if (view !== "skills") hideSkillForm();
       }
 
       /* --------------------------------------------------------------------
@@ -787,6 +914,261 @@
       document.getElementById("f-title").addEventListener("keydown", (e) => {
         if (e.key === "Enter") saveForm();
       });
+
+      /* ====================================================================
+         SKILLS — neu ergänzter Bereich (verändert NICHTS am Bestehenden)
+         --------------------------------------------------------------------
+         Skills liegen in einem EIGENEN Array "skills" und einem EIGENEN
+         localStorage-Schlüssel. Die Alltag-/Langfristig-Logik oben bleibt
+         komplett unberührt.
+
+         Datenmodell eines Skills:
+           {
+             id:        "sk-id",
+             name:      "Liegestütze",
+             direction: "Kraft aufbauen Richtung 100 Liegestütze", // Richtung/Notiz
+             milestones:[ { id, title: "20 am Stück", done: false } ],
+             log:       [ "2026-09-19T10:00:00.000Z", ... ]  // 1 Zeitstempel je Einheit
+           }
+
+         Berechnung:
+           XP    = (Anzahl Übungseinheiten × 5) + (Anzahl erreichter Meilensteine × 20)
+           Level = XP / 100, abgerundet
+         ==================================================================== */
+
+      const SKILLS_KEY = "questlog.skills.v1";
+
+      // Lädt Skills aus localStorage (mit Sicherheitsnetz), analog zu loadEntries().
+      function loadSkills() {
+        try {
+          const raw = localStorage.getItem(SKILLS_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          return Array.isArray(data) ? data : [];
+        } catch (err) {
+          console.warn("Konnte Skills nicht laden:", err);
+          return [];
+        }
+      }
+
+      // Speichert die Skill-Liste zurück in localStorage.
+      function saveSkills() {
+        try {
+          localStorage.setItem(SKILLS_KEY, JSON.stringify(skills));
+        } catch (err) {
+          console.warn("Konnte Skills nicht speichern:", err);
+        }
+      }
+
+      // --- Berechnungen ----------------------------------------------------
+      function skillXp(skill) {
+        const units = skill.log.length;                               // Übungseinheiten
+        const reached = skill.milestones.filter((m) => m.done).length; // erreichte Meilensteine
+        return units * 5 + reached * 20;
+      }
+      function skillLevel(skill) {
+        return Math.floor(skillXp(skill) / 100);
+      }
+
+      // --- Anzeige: alle Skill-Karten bauen --------------------------------
+      function renderSkills() {
+        const list = document.getElementById("sk-list");
+        list.innerHTML = "";
+
+        if (skills.length === 0) {
+          list.innerHTML =
+            '<div class="panel"><div class="empty">Noch keine Skills. Klicke oben auf „Neuer Skill".</div></div>';
+          return;
+        }
+        skills.forEach((skill) => list.appendChild(buildSkillCard(skill)));
+      }
+
+      // Baut die Karte für EINEN Skill.
+      function buildSkillCard(skill) {
+        const xp = skillXp(skill);
+        const level = skillLevel(skill);
+        const intoLevel = xp % 100; // XP-Fortschritt innerhalb des aktuellen Levels (0–99)
+
+        const card = document.createElement("div");
+        card.className = "skill-card";
+
+        // Meilensteine als HTML-Liste (jeweils mit Checkbox und Löschen-Knopf).
+        const msHtml = skill.milestones
+          .map(
+            (m) => `
+            <li class="ms-item ${m.done ? "done" : ""}" data-ms="${m.id}">
+              <button class="ms-check" title="Meilenstein umschalten">${m.done ? "✓" : ""}</button>
+              <span class="ms-title">${escapeHtml(m.title)}</span>
+              <button class="ms-del" title="Meilenstein löschen">✕</button>
+            </li>`
+          )
+          .join("");
+
+        // Historie: die letzten 5 Einheiten (neueste zuerst).
+        const recent = skill.log.slice().reverse().slice(0, 5);
+        const histHtml = recent.length
+          ? recent.map((ts) => `<span class="h-item">🗓️ ${formatDate(ts)}</span>`).join("")
+          : '<span class="h-empty">Noch keine Einheit eingetragen.</span>';
+
+        card.innerHTML = `
+          <div class="skill-head">
+            <div>
+              <div class="skill-name">🎯 ${escapeHtml(skill.name)}</div>
+              ${skill.direction ? `<div class="skill-dir">${escapeHtml(skill.direction)}</div>` : ""}
+            </div>
+            <button class="icon-btn del sk-del" title="Skill löschen">🗑️</button>
+          </div>
+
+          <div class="level-row">
+            <span class="level-badge">LVL ${level}</span>
+            <div class="xp">
+              <div class="xp-label">
+                <span>${xp} XP gesamt</span>
+                <span>${intoLevel} / 100 bis LVL ${level + 1}</span>
+              </div>
+              <div class="bar"><div class="fill" style="width:${intoLevel}%"></div></div>
+            </div>
+          </div>
+
+          <ul class="ms-list">${msHtml}</ul>
+          <div class="ms-add">
+            <input type="text" class="ms-add-input" placeholder="Neuen Meilenstein hinzufügen ..." />
+            <button class="ms-add-btn">+ Meilenstein</button>
+          </div>
+
+          <div class="skill-actions">
+            <button class="unit-btn">🏋️ Übungseinheit eintragen</button>
+            <span class="unit-count">${skill.log.length} Einheit${skill.log.length === 1 ? "" : "en"} · +5 XP je Einheit</span>
+          </div>
+
+          <div class="history">
+            <div class="h-title">Letzte Einheiten</div>
+            ${histHtml}
+          </div>
+        `;
+
+        // --- Ereignisse dieser Karte verbinden ---
+        card.querySelector(".unit-btn").addEventListener("click", () => addUnit(skill.id));
+        card.querySelector(".sk-del").addEventListener("click", () => deleteSkill(skill.id));
+
+        // Für jeden Meilenstein: umschalten und löschen.
+        card.querySelectorAll(".ms-item").forEach((li) => {
+          const msId = li.dataset.ms;
+          li.querySelector(".ms-check").addEventListener("click", () => toggleMilestone(skill.id, msId));
+          li.querySelector(".ms-del").addEventListener("click", () => deleteMilestone(skill.id, msId));
+        });
+
+        // Meilenstein hinzufügen (per Knopf oder Enter im Eingabefeld).
+        const addInput = card.querySelector(".ms-add-input");
+        const addBtn = card.querySelector(".ms-add-btn");
+        const doAdd = () => addMilestone(skill.id, addInput.value);
+        addBtn.addEventListener("click", doAdd);
+        addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+
+        return card;
+      }
+
+      // --- Aktionen --------------------------------------------------------
+
+      // Übungseinheit eintragen: aktuellen Zeitstempel ans Log hängen (+5 XP).
+      function addUnit(skillId) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        skill.log.push(new Date().toISOString());
+        saveSkills();
+        renderSkills();
+      }
+
+      // Meilenstein erreicht/offen umschalten (erreicht = +20 XP).
+      function toggleMilestone(skillId, msId) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        const ms = skill.milestones.find((m) => m.id === msId);
+        if (!ms) return;
+        ms.done = !ms.done;
+        saveSkills();
+        renderSkills();
+      }
+
+      // Neuen Meilenstein zu einem Skill hinzufügen.
+      function addMilestone(skillId, title) {
+        const clean = (title || "").trim();
+        if (!clean) return;
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        skill.milestones.push({ id: makeId(), title: clean, done: false });
+        saveSkills();
+        renderSkills();
+      }
+
+      // Einen Meilenstein löschen.
+      function deleteMilestone(skillId, msId) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        skill.milestones = skill.milestones.filter((m) => m.id !== msId);
+        saveSkills();
+        renderSkills();
+      }
+
+      // Einen ganzen Skill löschen (mit Sicherheitsabfrage).
+      function deleteSkill(skillId) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        if (!confirm(`Skill „${skill.name}" wirklich löschen?`)) return;
+        skills = skills.filter((s) => s.id !== skillId);
+        saveSkills();
+        renderSkills();
+      }
+
+      // --- Formular für neuen Skill ---------------------------------------
+      function showSkillForm() {
+        document.getElementById("sk-form-panel").classList.remove("hidden");
+        document.getElementById("sk-name").focus();
+      }
+      function hideSkillForm() {
+        document.getElementById("sk-form-panel").classList.add("hidden");
+        resetSkillForm();
+      }
+      function resetSkillForm() {
+        document.getElementById("sk-name").value = "";
+        document.getElementById("sk-direction").value = "";
+        document.querySelectorAll(".sk-ms-input").forEach((inp) => (inp.value = ""));
+      }
+      function saveSkillForm() {
+        const name = document.getElementById("sk-name").value.trim();
+        const direction = document.getElementById("sk-direction").value.trim();
+
+        // Name ist Pflicht.
+        if (!name) {
+          alert("Bitte gib einen Namen für den Skill ein.");
+          return;
+        }
+
+        // Bis zu 3 erste Meilensteine aus den Eingabefeldern einsammeln
+        // (leere Felder werden ignoriert).
+        const milestones = [];
+        document.querySelectorAll(".sk-ms-input").forEach((inp) => {
+          const t = inp.value.trim();
+          if (t) milestones.push({ id: makeId(), title: t, done: false });
+        });
+
+        skills.push({
+          id: makeId(),
+          name: name,
+          direction: direction,
+          milestones: milestones,
+          log: [], // noch keine Übungseinheiten
+        });
+
+        saveSkills();
+        hideSkillForm();
+        renderSkills();
+      }
+
+      // Skill-Formular-Knöpfe verbinden.
+      document.getElementById("sk-new-btn").addEventListener("click", showSkillForm);
+      document.getElementById("sk-save").addEventListener("click", saveSkillForm);
+      document.getElementById("sk-cancel").addEventListener("click", hideSkillForm);
 
       /* --------------------------------------------------------------------
          D) START: erste Anzeige aufbauen

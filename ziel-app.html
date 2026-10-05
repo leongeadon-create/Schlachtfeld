@@ -378,6 +378,27 @@
       .q-sub-list li { font-size: 0.85rem; color: var(--text-dim); }
       .q-sub-list li::before { content: "↳ "; color: var(--accent); }
 
+      /* ====================================================================
+         8) HABITS
+         ==================================================================== */
+      /* Kleine Zwischenüberschrift (z. B. "Habits heute" im Dashboard) */
+      .block-sub {
+        color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;
+        letter-spacing: 1px; margin: 16px 0 2px;
+      }
+
+      .habit-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-left: 4px solid var(--success);   /* grüner Habit-Streifen */
+        border-radius: var(--radius); padding: 16px; margin-top: 12px;
+        box-shadow: var(--shadow);
+      }
+      /* Wenn heute schon erledigt: Streifen in Akzentfarbe */
+      .habit-card.done-today { border-left-color: var(--accent); }
+
+      .habit-progress { margin-top: 12px; color: var(--text-dim); font-size: 0.9rem; }
+      .habit-progress strong { color: var(--text); }
+
       /* Auf schmalen Bildschirmen die 3 Statistik-Kacheln enger stapeln */
       @media (max-width: 520px) {
         .stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -406,6 +427,7 @@
           <button class="tab active" data-view="dashboard">📊 Dashboard</button>
           <button class="tab" data-view="all">📋 Alle Einträge</button>
           <button class="tab" data-view="skills">🧠 Skills</button>
+          <button class="tab" data-view="habits">🔁 Habits</button>
           <button class="tab" data-view="form">➕ Neuer Eintrag</button>
           <button class="tab" data-view="quick">⚡ Schnelleingabe</button>
         </nav>
@@ -450,6 +472,13 @@
           <h2>🔥 Heute fällig</h2>
           <p class="hint">Einträge mit Deadline heute (noch offen).</p>
           <div id="due-today"></div>
+
+          <!-- Heute fällige Habits erscheinen hier neben den Aufgaben.
+               Der Block wird nur gezeigt, wenn es fällige Habits gibt. -->
+          <div id="due-habits-wrap" class="hidden">
+            <div class="block-sub">🔁 Habits heute</div>
+            <div id="due-habits"></div>
+          </div>
         </div>
 
         <!-- Diese Woche fällig -->
@@ -537,6 +566,63 @@
 
         <!-- Hierhin schreibt JavaScript die Skill-Karten -->
         <div id="sk-list"></div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT: HABITS (wiederkehrende Aktivitäten)
+           ================================================================ -->
+      <section id="view-habits" class="hidden">
+        <div class="panel">
+          <h2>🔁 Habits</h2>
+          <p class="hint">
+            Wiederkehrende Aktivitäten. Ein mit einem Skill verknüpfter Habit zahlt
+            beim Abhaken automatisch eine Übungseinheit (+5 XP) in diesen Skill ein.
+          </p>
+          <button class="btn primary" id="hb-new-btn">➕ Neuer Habit</button>
+        </div>
+
+        <!-- Formular für einen neuen Habit (versteckt bis "Neuer Habit") -->
+        <div class="panel hidden" id="hb-form-panel">
+          <h2>Neuer Habit</h2>
+
+          <div class="field">
+            <label for="hb-name">Name *</label>
+            <input type="text" id="hb-name" placeholder="z. B. Vokabeln lernen" />
+          </div>
+
+          <div class="field">
+            <label for="hb-frequency">Frequenz</label>
+            <select id="hb-frequency">
+              <option value="daily">Täglich</option>
+              <option value="weekly">X-mal pro Woche</option>
+            </select>
+          </div>
+
+          <!-- Nur sichtbar, wenn "X-mal pro Woche" gewählt ist -->
+          <div class="field hidden" id="hb-perweek-field">
+            <label for="hb-perweek">Mal pro Woche</label>
+            <input type="number" id="hb-perweek" min="1" max="7" value="3" />
+          </div>
+
+          <div class="field">
+            <label for="hb-skill">Mit Skill verknüpfen (optional)</label>
+            <select id="hb-skill">
+              <option value="">— kein Skill —</option>
+              <!-- weitere Optionen füllt JavaScript aus der Skill-Liste -->
+            </select>
+            <p class="hint" style="margin-top: 6px">
+              Abhaken erzeugt dann automatisch eine Übungseinheit im Skill.
+            </p>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="hb-save">💾 Habit erstellen</button>
+            <button class="btn ghost" id="hb-cancel">Abbrechen</button>
+          </div>
+        </div>
+
+        <!-- Hierhin schreibt JavaScript die Habit-Karten -->
+        <div id="hb-list"></div>
       </section>
 
       <!-- ================================================================
@@ -658,11 +744,24 @@
 
          XP    = (Anzahl Übungseinheiten × 5) + (Anzahl erreichter Meilensteine × 20)
          Level = XP / 100, abgerundet
+
+         Habit (wiederkehrende Aktivität):
+           {
+             id, name,
+             frequency:   "daily" | "weekly",
+             timesPerWeek: Zahl | null,          // nur bei "weekly" genutzt
+             skillId:     id | null,             // optionale Kopplung an einen Skill
+             completions: [ { date, logId } ]    // je erledigtem Tag ein Eintrag
+           }
+         Beim Abhaken eines Habits mit skillId wird automatisch ein Eintrag im
+         Log des Skills erzeugt ({ date, note: "Habit: <name>" }); die "logId"
+         merkt sich diesen, damit er beim Rückgängigmachen wieder entfernt wird.
          -------------------------------------------------------------------- */
 
       // Schlüssel, unter denen wir im Browser speichern.
       const STORAGE_KEY = "questlog.entries.v1";
       const SKILLS_KEY  = "questlog.skills.v1";
+      const HABITS_KEY  = "questlog.habits.v1";
 
       // Standard-Bereich für Skills, die beim Laden noch keinen "area" haben.
       const DEFAULT_AREA = "work";
@@ -690,9 +789,10 @@
         creative:  { label: "Kreatives", icon: "🎨" },
       };
 
-      // Die beiden Haupt-Datenlisten.
+      // Die Haupt-Datenlisten (jede in einem EIGENEN localStorage-Schlüssel).
       let entries = loadEntries();
       let skills = loadSkills();
+      let habits = loadHabits();
 
       // Merkt sich den aktuell gewählten Kategorie-Filter in Ansicht 2.
       let activeFilter = "all";
@@ -813,6 +913,11 @@
       function isoInDays(n) {
         const d = new Date();
         d.setDate(d.getDate() + n);
+        return isoFromDate(d);
+      }
+
+      // Formatiert ein Date-Objekt als "YYYY-MM-DD" (lokale Zeit).
+      function isoFromDate(d) {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, "0");
         const day = String(d.getDate()).padStart(2, "0");
@@ -827,6 +932,7 @@
         renderDashboard();
         renderAllList();
         renderSkills();
+        renderHabits();
       }
 
       // Baut Statistik-Kacheln, XP-Balken und die beiden Fällig-Listen.
@@ -860,6 +966,18 @@
 
         renderInto("due-today", dueToday, "Heute ist nichts fällig. 🎉");
         renderInto("due-week", dueWeek, "Diese Woche steht nichts an.");
+
+        // Heute fällige Habits (noch nicht erledigt) in der Tagesübersicht zeigen.
+        const dueHabits = habits.filter(isHabitDueToday);
+        const wrap = document.getElementById("due-habits-wrap");
+        const box = document.getElementById("due-habits");
+        box.innerHTML = "";
+        if (dueHabits.length === 0) {
+          wrap.classList.add("hidden"); // kein Block, wenn nichts fällig
+        } else {
+          wrap.classList.remove("hidden");
+          dueHabits.forEach((h) => box.appendChild(buildHabitDashboardRow(h)));
+        }
       }
 
       // Baut die Liste in Ansicht 2, gefiltert nach der gewählten Kategorie.
@@ -1091,6 +1209,7 @@
         document.getElementById("view-skills").classList.toggle("hidden", view !== "skills");
         document.getElementById("view-form").classList.toggle("hidden", view !== "form");
         document.getElementById("view-quick").classList.toggle("hidden", view !== "quick");
+        document.getElementById("view-habits").classList.toggle("hidden", view !== "habits");
 
         document.querySelectorAll(".tab").forEach((tab) => {
           tab.classList.toggle("active", tab.dataset.view === view);
@@ -1098,6 +1217,7 @@
 
         if (view !== "form") resetForm();
         if (view !== "skills") hideSkillForm();
+        if (view !== "habits") hideHabitForm();
       }
 
       /* --------------------------------------------------------------------
@@ -1267,7 +1387,7 @@
       function addUnit(skillId, note) {
         const skill = skills.find((s) => s.id === skillId);
         if (!skill) return;
-        skill.log.push({ date: new Date().toISOString(), note: (note || "").trim() });
+        skill.log.push({ id: makeId(), date: new Date().toISOString(), note: (note || "").trim() });
         saveSkills();
         renderSkills();
       }
@@ -1555,6 +1675,297 @@
         document.getElementById("q-preview-panel").classList.add("hidden");
       });
 
+      /* ====================================================================
+         HABITS (wiederkehrende Aktivitäten, optional an einen Skill gekoppelt)
+         ==================================================================== */
+
+      // Laden + Migrieren der Habit-Liste.
+      function loadHabits() {
+        try {
+          const raw = localStorage.getItem(HABITS_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          if (!Array.isArray(data)) return [];
+          return data.map(migrateHabit);
+        } catch (err) {
+          console.warn("Konnte Habits nicht laden:", err);
+          return [];
+        }
+      }
+
+      // Stellt sicher, dass ältere/kaputte Habit-Daten alle Felder haben.
+      function migrateHabit(h) {
+        const copy = Object.assign({}, h);
+        if (copy.frequency !== "weekly") copy.frequency = copy.frequency || "daily";
+        if (!Array.isArray(copy.completions)) copy.completions = [];
+        if (copy.skillId === undefined) copy.skillId = null;
+        if (copy.timesPerWeek === undefined) copy.timesPerWeek = null;
+        return copy;
+      }
+
+      function saveHabits() {
+        try {
+          localStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+        } catch (err) {
+          console.warn("Konnte Habits nicht speichern:", err);
+        }
+      }
+
+      /* ---- Datums-/Status-Hilfen für Habits ------------------------------ */
+
+      // Ist der Habit heute schon erledigt?
+      function isHabitDoneToday(habit) {
+        const today = todayISO();
+        return habit.completions.some((c) => c.date === today);
+      }
+
+      // Montag der aktuellen Woche als "YYYY-MM-DD" (für Wochen-Habits).
+      function startOfWeekISO() {
+        const d = new Date();
+        const dayMoFirst = (d.getDay() + 6) % 7; // Mo=0 ... So=6
+        d.setDate(d.getDate() - dayMoFirst);
+        return isoFromDate(d);
+      }
+
+      // Wie oft wurde der Habit diese Woche erledigt?
+      function weeklyCount(habit) {
+        const start = startOfWeekISO();
+        return habit.completions.filter((c) => c.date >= start).length;
+      }
+
+      // Ist der Habit heute fällig (und noch offen)?
+      function isHabitDueToday(habit) {
+        if (isHabitDoneToday(habit)) return false; // heute erledigt -> nicht mehr fällig
+        if (habit.frequency === "daily") return true;
+        const target = habit.timesPerWeek || 1;
+        return weeklyCount(habit) < target; // Wochenziel noch nicht erreicht
+      }
+
+      // Tägliche Streak: wie viele Tage in Folge (bis heute/gestern) erledigt.
+      function dailyStreak(habit) {
+        const dates = new Set(habit.completions.map((c) => c.date));
+        const d = new Date();
+        // Ist heute noch offen, zählen wir ab gestern (der Streak ist noch intakt).
+        if (!dates.has(todayISO())) d.setDate(d.getDate() - 1);
+        let streak = 0;
+        while (dates.has(isoFromDate(d))) {
+          streak++;
+          d.setDate(d.getDate() - 1);
+        }
+        return streak;
+      }
+
+      /* ---- Anzeige ------------------------------------------------------- */
+
+      function renderHabits() {
+        const list = document.getElementById("hb-list");
+        list.innerHTML = "";
+        if (habits.length === 0) {
+          list.innerHTML =
+            '<div class="panel"><div class="empty">Noch keine Habits. Klicke oben auf „Neuer Habit".</div></div>';
+          return;
+        }
+        habits.forEach((habit) => list.appendChild(buildHabitCard(habit)));
+      }
+
+      // Kleiner Text für die Frequenz.
+      function frequencyLabel(habit) {
+        return habit.frequency === "daily"
+          ? "Täglich"
+          : (habit.timesPerWeek || 1) + "× pro Woche";
+      }
+
+      // Karte für EINEN Habit (in der Habits-Ansicht).
+      function buildHabitCard(habit) {
+        const done = isHabitDoneToday(habit);
+        const skill = habit.skillId ? skills.find((s) => s.id === habit.skillId) : null;
+
+        // Fortschrittszeile: Streak (täglich) oder Wochenzähler (wöchentlich).
+        let progressHtml;
+        if (habit.frequency === "daily") {
+          progressHtml = `🔥 Streak: <strong>${dailyStreak(habit)}</strong> Tag(e)`;
+        } else {
+          const target = habit.timesPerWeek || 1;
+          progressHtml = `📅 Diese Woche: <strong>${weeklyCount(habit)}/${target}</strong>`;
+        }
+
+        const card = document.createElement("div");
+        card.className = "habit-card" + (done ? " done-today" : "");
+        card.innerHTML = `
+          <div class="skill-head">
+            <div>
+              <div class="skill-name">🔁 ${escapeHtml(habit.name)}</div>
+              <div style="margin-top:4px">
+                <span class="badge">${frequencyLabel(habit)}</span>
+                ${
+                  skill
+                    ? `<span class="badge area">🎯 ${escapeHtml(skill.name)}</span>`
+                    : `<span class="badge">kein Skill</span>`
+                }
+              </div>
+            </div>
+            <button class="icon-btn del hb-del" title="Habit löschen">🗑️</button>
+          </div>
+
+          <div class="habit-progress">${progressHtml}</div>
+
+          <div class="skill-actions">
+            <button class="unit-btn hb-toggle">${done ? "✓ Heute erledigt — rückgängig" : "Heute abhaken"}</button>
+            ${habit.skillId ? `<span class="unit-count">Abhaken zahlt +5 XP in den Skill ein</span>` : ""}
+          </div>
+        `;
+
+        card.querySelector(".hb-toggle").addEventListener("click", () => toggleHabitToday(habit.id));
+        card.querySelector(".hb-del").addEventListener("click", () => deleteHabit(habit.id));
+        return card;
+      }
+
+      // Kompakte Zeile für die Tagesübersicht im Dashboard.
+      function buildHabitDashboardRow(habit) {
+        const skill = habit.skillId ? skills.find((s) => s.id === habit.skillId) : null;
+        const el = document.createElement("div");
+        el.className = "entry"; // nutzt das Eintrags-Styling (ohne Kategorie-Streifen)
+        el.innerHTML = `
+          <button class="check" title="Heute abhaken"></button>
+          <div class="body">
+            <div class="row1">
+              <span class="name">🔁 ${escapeHtml(habit.name)}</span>
+              <span class="badge">${frequencyLabel(habit)}</span>
+              ${skill ? `<span class="badge area">🎯 ${escapeHtml(skill.name)}</span>` : ""}
+            </div>
+          </div>
+        `;
+        el.querySelector(".check").addEventListener("click", () => toggleHabitToday(habit.id));
+        return el;
+      }
+
+      /* ---- Aktionen ------------------------------------------------------ */
+
+      // Habit für HEUTE abhaken bzw. wieder rückgängig machen.
+      // Die Skill-Kopplung passiert genau hier.
+      function toggleHabitToday(habitId) {
+        const habit = habits.find((h) => h.id === habitId);
+        if (!habit) return;
+
+        const today = todayISO();
+        const idx = habit.completions.findIndex((c) => c.date === today);
+
+        if (idx >= 0) {
+          // ----- Rückgängig: Completion entfernen -----
+          const comp = habit.completions[idx];
+          // Gab es einen gekoppelten Skill-Log-Eintrag? Dann mitlöschen.
+          if (comp.logId && habit.skillId) {
+            const skill = skills.find((s) => s.id === habit.skillId);
+            if (skill) skill.log = skill.log.filter((e) => e.id !== comp.logId);
+          }
+          habit.completions.splice(idx, 1);
+        } else {
+          // ----- Abhaken: Completion hinzufügen -----
+          let logId = null;
+          // Mit Skill gekoppelt? Dann automatisch eine Übungseinheit eintragen.
+          if (habit.skillId) {
+            const skill = skills.find((s) => s.id === habit.skillId);
+            if (skill) {
+              logId = makeId();
+              skill.log.push({
+                id: logId,
+                date: new Date().toISOString(),
+                note: "Habit: " + habit.name,
+              });
+            }
+          }
+          habit.completions.push({ date: today, logId: logId });
+        }
+
+        saveHabits();
+        saveSkills(); // XP/Level des Skills haben sich evtl. geändert
+        render();     // Dashboard, Skills und Habits neu zeichnen
+      }
+
+      function deleteHabit(habitId) {
+        const habit = habits.find((h) => h.id === habitId);
+        if (!habit) return;
+        if (!confirm(`Habit „${habit.name}" wirklich löschen?`)) return;
+        // Hinweis: bereits eingetragene Skill-XP bleiben erhalten (die Einheiten
+        // haben ja stattgefunden). Nur der Habit selbst verschwindet.
+        habits = habits.filter((h) => h.id !== habitId);
+        saveHabits();
+        renderHabits();
+        renderDashboard();
+      }
+
+      /* ---- Habit-Formular ------------------------------------------------ */
+
+      // Füllt das Skill-Dropdown im Habit-Formular mit den aktuellen Skills.
+      function populateHabitSkillSelect() {
+        const sel = document.getElementById("hb-skill");
+        sel.innerHTML = '<option value="">— kein Skill —</option>';
+        skills.forEach((s) => {
+          const opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.name;
+          sel.appendChild(opt);
+        });
+      }
+
+      function showHabitForm() {
+        populateHabitSkillSelect();
+        document.getElementById("hb-form-panel").classList.remove("hidden");
+        document.getElementById("hb-name").focus();
+      }
+      function hideHabitForm() {
+        document.getElementById("hb-form-panel").classList.add("hidden");
+        resetHabitForm();
+      }
+      function resetHabitForm() {
+        document.getElementById("hb-name").value = "";
+        document.getElementById("hb-frequency").value = "daily";
+        document.getElementById("hb-perweek").value = "3";
+        document.getElementById("hb-perweek-field").classList.add("hidden");
+        document.getElementById("hb-skill").value = "";
+      }
+      function saveHabitForm() {
+        const name = document.getElementById("hb-name").value.trim();
+        const frequency = document.getElementById("hb-frequency").value;
+        const skillId = document.getElementById("hb-skill").value || null;
+
+        if (!name) {
+          alert("Bitte gib einen Namen für den Habit ein.");
+          return;
+        }
+
+        // Wochenziel nur bei "weekly" erfassen (1–7).
+        let timesPerWeek = null;
+        if (frequency === "weekly") {
+          const n = parseInt(document.getElementById("hb-perweek").value, 10);
+          timesPerWeek = Math.min(7, Math.max(1, isNaN(n) ? 1 : n));
+        }
+
+        habits.push({
+          id: makeId(),
+          name: name,
+          frequency: frequency,
+          timesPerWeek: timesPerWeek,
+          skillId: skillId,
+          completions: [],
+        });
+
+        saveHabits();
+        hideHabitForm();
+        renderHabits();
+      }
+
+      // Formular-Knöpfe + Logik verbinden.
+      document.getElementById("hb-new-btn").addEventListener("click", showHabitForm);
+      document.getElementById("hb-save").addEventListener("click", saveHabitForm);
+      document.getElementById("hb-cancel").addEventListener("click", hideHabitForm);
+      // Das Feld "Mal pro Woche" nur bei "X-mal pro Woche" zeigen.
+      document.getElementById("hb-frequency").addEventListener("change", (e) => {
+        document
+          .getElementById("hb-perweek-field")
+          .classList.toggle("hidden", e.target.value !== "weekly");
+      });
+
       /* --------------------------------------------------------------------
          D) START: Migrationen sichern + erste Anzeige aufbauen
          -------------------------------------------------------------------- */
@@ -1562,6 +1973,7 @@
       // Bereinigung (z. B. entferntes skillData) dauerhaft gespeichert ist.
       saveEntries();
       saveSkills();
+      saveHabits();
 
       render();
       renderMigrationNotice();

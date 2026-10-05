@@ -399,6 +399,29 @@
       .habit-progress { margin-top: 12px; color: var(--text-dim); font-size: 0.9rem; }
       .habit-progress strong { color: var(--text); }
 
+      /* Monatsansicht: ein Kästchen pro Tag des aktuellen Monats */
+      .month-grid { margin-top: 16px; }
+      .mg-title {
+        color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;
+        letter-spacing: 1px; margin-bottom: 8px;
+      }
+      .mg-cells { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+      .mg-weekday { font-size: 0.62rem; color: var(--text-dim); text-align: center; padding-bottom: 2px; }
+      .mg-cell {
+        aspect-ratio: 1 / 1; border-radius: 6px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        display: grid; place-items: center; font-size: 0.7rem; color: var(--text-dim);
+      }
+      /* erledigte Tage farbig hervorgehoben */
+      .mg-cell.done {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #041014; border-color: transparent; font-weight: 700;
+      }
+      /* heutiger Tag deutlich umrandet */
+      .mg-cell.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+      /* Leer-Kästchen vor dem Monatsersten (für die Wochentags-Ausrichtung) */
+      .mg-cell.blank { background: transparent; border: none; }
+
       /* Auf schmalen Bildschirmen die 3 Statistik-Kacheln enger stapeln */
       @media (max-width: 520px) {
         .stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -1775,6 +1798,44 @@
           : (habit.timesPerWeek || 1) + "× pro Woche";
       }
 
+      // Baut das Monatsraster (aktueller Monat) für einen Habit als HTML-Text.
+      // Erledigte Tage werden farbig, der heutige Tag wird umrandet.
+      function monthGridHtml(habit) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0 = Januar
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        // Wochentag des Monatsersten, Montag-zuerst (Mo=0 ... So=6).
+        const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+
+        // Alle erledigten Tage dieses Habits als schnelles Nachschlage-Set.
+        const doneSet = new Set(habit.completions.map((c) => c.date));
+        const todayStr = todayISO();
+
+        // Kopfzeile mit Wochentagen.
+        const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+        let cells = weekdays.map((w) => `<div class="mg-weekday">${w}</div>`).join("");
+
+        // Leer-Kästchen, damit Tag 1 unter dem richtigen Wochentag startet.
+        for (let i = 0; i < offset; i++) cells += `<div class="mg-cell blank"></div>`;
+
+        // Ein Kästchen pro Tag des Monats.
+        for (let day = 1; day <= daysInMonth; day++) {
+          const iso = isoFromDate(new Date(year, month, day));
+          const classes = ["mg-cell"];
+          if (doneSet.has(iso)) classes.push("done");   // erledigt -> farbig
+          if (iso === todayStr) classes.push("today");  // heute -> umrandet
+          cells += `<div class="${classes.join(" ")}" title="${iso}">${day}</div>`;
+        }
+
+        const monthName = now.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+        return `
+          <div class="month-grid">
+            <div class="mg-title">Monatsübersicht · ${monthName}</div>
+            <div class="mg-cells">${cells}</div>
+          </div>`;
+      }
+
       // Karte für EINEN Habit (in der Habits-Ansicht).
       function buildHabitCard(habit) {
         const done = isHabitDoneToday(habit);
@@ -1813,6 +1874,8 @@
             <button class="unit-btn hb-toggle">${done ? "✓ Heute erledigt — rückgängig" : "Heute abhaken"}</button>
             ${habit.skillId ? `<span class="unit-count">Abhaken zahlt +5 XP in den Skill ein</span>` : ""}
           </div>
+
+          ${monthGridHtml(habit)}
         `;
 
         card.querySelector(".hb-toggle").addEventListener("click", () => toggleHabitToday(habit.id));

@@ -12,7 +12,7 @@
       ========================================================================
       Aufbau dieser Datei (von oben nach unten):
         1. <style>  ... das gesamte CSS (Aussehen / dunkles Gaming-Theme)
-        2. <body>   ... die Struktur (Header, 3 Ansichten, Formular)
+        2. <body>   ... die Struktur (Header, Ansichten, Formulare)
         3. <script> ... die Logik (Daten, Speichern, Anzeigen, Ereignisse)
 
       Für Einsteiger:
@@ -44,6 +44,12 @@
         --success:       #4ade80;  /* Grün für "erledigt" */
         --radius:        12px;     /* Standard-Eckenrundung */
         --shadow:        0 8px 24px rgba(0, 0, 0, 0.4);
+
+        /* Kategorie-Farben (eine je Aufgaben-Kategorie) */
+        --cat-arbeit:    #22d3ee;  /* Cyan */
+        --cat-alltag:    #a855f7;  /* Violett */
+        --cat-privat:    #f472b6;  /* Pink */
+        --cat-ziel:      #fbbf24;  /* Amber */
       }
 
       /* Grund-Reset: einheitliches Box-Modell, Abstände zurücksetzen */
@@ -81,7 +87,7 @@
       }
       .brand .sub { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; }
 
-      /* ---- Tab-Navigation (Dashboard / Alle / Neu) ---------------------- */
+      /* ---- Tab-Navigation ----------------------------------------------- */
       nav.tabs { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
       .tab {
         background: var(--surface); color: var(--text-dim);
@@ -147,12 +153,13 @@
         display: flex; align-items: flex-start; gap: 12px;
         background: var(--surface-2); border: 1px solid var(--border);
         border-radius: var(--radius); padding: 12px 14px; margin-top: 10px;
+        border-left: 4px solid var(--border); /* farbiger Streifen = Kategorie */
       }
-      /* farbiger Streifen links = visuelle Kategorie-Markierung */
-      .entry { border-left: 4px solid var(--border); }
-      .entry.cat-alltag { border-left-color: var(--accent); }
-      .entry.cat-skill  { border-left-color: var(--accent-2); }
-      .entry.cat-ziel   { border-left-color: #fbbf24; }
+      /* Kategorie-Streifen links (eine Farbe je Kategorie) */
+      .entry.cat-arbeit { border-left-color: var(--cat-arbeit); }
+      .entry.cat-alltag { border-left-color: var(--cat-alltag); }
+      .entry.cat-privat { border-left-color: var(--cat-privat); }
+      .entry.cat-ziel   { border-left-color: var(--cat-ziel); }
 
       .entry .check {
         flex: 0 0 auto; width: 26px; height: 26px; margin-top: 2px;
@@ -167,19 +174,39 @@
       /* erledigte Einträge werden durchgestrichen und abgedunkelt */
       .entry.is-done .name { text-decoration: line-through; color: var(--text-dim); }
 
-      /* kleine Etiketten ("Badges") für Kategorie und Deadline */
+      /* kleine Etiketten ("Badges") für Kategorie / Bereich / Deadline */
       .badge {
         font-size: 0.72rem; font-weight: 600; padding: 2px 8px;
         border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
       }
-      .badge.cat-alltag { color: var(--accent); border-color: var(--accent); }
-      .badge.cat-skill  { color: var(--accent-2); border-color: var(--accent-2); }
-      .badge.cat-ziel   { color: #fbbf24; border-color: #fbbf24; }
+      .badge.cat-arbeit { color: var(--cat-arbeit); border-color: var(--cat-arbeit); }
+      .badge.cat-alltag { color: var(--cat-alltag); border-color: var(--cat-alltag); }
+      .badge.cat-privat { color: var(--cat-privat); border-color: var(--cat-privat); }
+      .badge.cat-ziel   { color: var(--cat-ziel); border-color: var(--cat-ziel); }
+      .badge.area       { color: var(--accent-2); border-color: var(--accent-2); }
       .badge.due-today  { color: #041014; background: var(--accent); border-color: transparent; }
       .badge.overdue    { color: #2a0000; background: var(--danger); border-color: transparent; }
 
       .entry .note { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; white-space: pre-wrap; }
       .entry .meta { color: var(--text-dim); font-size: 0.75rem; margin-top: 4px; }
+
+      /* ---- Unterpunkte (subtasks), einklappbar -------------------------- */
+      .sub-toggle {
+        background: transparent; border: none; color: var(--accent);
+        cursor: pointer; font-size: 0.8rem; font-weight: 600;
+        margin-top: 6px; padding: 0;
+      }
+      .sub-toggle:hover { filter: brightness(1.15); }
+      .sub-list { list-style: none; margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+      .sub-item { display: flex; align-items: center; gap: 8px; }
+      .sub-check {
+        width: 20px; height: 20px; flex: 0 0 auto; border-radius: 5px;
+        border: 2px solid var(--border); background: transparent; cursor: pointer;
+        color: var(--success); display: grid; place-items: center; font-size: 0.7rem;
+      }
+      .sub-check:hover { border-color: var(--success); }
+      .sub-text { font-size: 0.85rem; color: var(--text); }
+      .sub-item.done .sub-text { text-decoration: line-through; color: var(--text-dim); }
 
       /* Aktionsknöpfe (Bearbeiten / Löschen) rechts im Eintrag */
       .entry .actions { flex: 0 0 auto; display: flex; gap: 6px; }
@@ -206,7 +233,7 @@
       .filter.active { color: var(--text); border-color: var(--accent); background: rgba(34,211,238,0.1); }
 
       /* ====================================================================
-         5) FORMULAR
+         5) FORMULARE
          ==================================================================== */
       .field { margin-top: 12px; }
       .field label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
@@ -236,7 +263,7 @@
       .btn.ghost:hover { border-color: var(--accent); }
 
       /* ====================================================================
-         6) SKILLS (neu ergänzt — verändert nichts am Bestehenden)
+         6) SKILLS
          Wir nutzen dieselben Design-Tokens (Farben) wie oben, damit der
          Look konsistent bleibt.
          ==================================================================== */
@@ -249,10 +276,10 @@
       .skill-head { display: flex; align-items: flex-start; gap: 10px; }
       .skill-head > div:first-child { flex: 1 1 auto; min-width: 0; }
       .skill-name { font-size: 1.1rem; font-weight: 800; }
-      .skill-dir { color: var(--text-dim); font-size: 0.85rem; margin-top: 2px; white-space: pre-wrap; }
+      .skill-dir { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; white-space: pre-wrap; }
 
       /* Level-Badge + XP-Balken nebeneinander */
-      .level-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+      .level-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
       .level-badge {
         flex: 0 0 auto; font-weight: 800; font-size: 0.8rem; color: #041014;
         background: linear-gradient(90deg, var(--accent), var(--accent-2));
@@ -291,14 +318,20 @@
       }
       .ms-add button:hover { color: var(--text); border-color: var(--accent-2); }
 
-      /* Aktionen + Übungseinheit-Button */
+      /* Aktionen + Übungseinheit-Button (mit optionalem Notizfeld) */
       .skill-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      .unit-note-input {
+        flex: 1 1 180px; background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font-size: 0.85rem;
+      }
+      .unit-note-input:focus { outline: none; border-color: var(--accent); }
       .unit-btn {
+        flex: 0 0 auto;
         background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #041014;
         border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer;
       }
       .unit-btn:hover { filter: brightness(1.1); }
-      .unit-count { color: var(--text-dim); font-size: 0.85rem; }
+      .unit-count { color: var(--text-dim); font-size: 0.85rem; flex-basis: 100%; }
 
       /* Kleine Historie der letzten Einheiten */
       .history { margin-top: 14px; }
@@ -309,6 +342,41 @@
         border-radius: 999px; padding: 3px 9px; margin: 0 6px 6px 0;
       }
       .history .h-empty { color: var(--text-dim); font-size: 0.82rem; }
+
+      /* Hinweis-Banner (z. B. nach Daten-Migration) */
+      .notice {
+        background: rgba(168, 85, 247, 0.12); border: 1px solid var(--accent-2);
+        color: var(--text); border-radius: var(--radius); padding: 12px 14px;
+        margin-top: 16px; font-size: 0.88rem; display: flex; gap: 10px; align-items: flex-start;
+      }
+      .notice button {
+        margin-left: auto; flex: 0 0 auto; background: transparent;
+        border: 1px solid var(--border); color: var(--text-dim);
+        border-radius: 8px; padding: 4px 9px; cursor: pointer;
+      }
+      .notice button:hover { color: var(--text); border-color: var(--accent-2); }
+
+      /* ====================================================================
+         7) SCHNELLEINGABE (Vorschau-Karten)
+         ==================================================================== */
+      .q-task {
+        display: flex; gap: 10px; align-items: flex-start;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 12px; margin-top: 10px;
+      }
+      .q-task.excluded { opacity: 0.45; }
+      .q-include { width: 20px; height: 20px; margin-top: 4px; flex: 0 0 auto; accent-color: var(--accent); cursor: pointer; }
+      .q-task-body { flex: 1 1 auto; min-width: 0; }
+      .q-title-input {
+        width: 100%; background: var(--surface); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 8px 10px; font-size: 0.95rem; font-weight: 700;
+      }
+      .q-title-input:focus { outline: none; border-color: var(--accent); }
+      .q-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .q-sub-list { list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+      .q-sub-list li { font-size: 0.85rem; color: var(--text-dim); }
+      .q-sub-list li::before { content: "↳ "; color: var(--accent); }
 
       /* Auf schmalen Bildschirmen die 3 Statistik-Kacheln enger stapeln */
       @media (max-width: 520px) {
@@ -332,13 +400,14 @@
           </div>
         </div>
 
-        <!-- Die Tabs schalten zwischen den 3 Ansichten um.
+        <!-- Die Tabs schalten zwischen den Ansichten um.
              data-view verweist auf die passende Ansicht unten. -->
         <nav class="tabs">
           <button class="tab active" data-view="dashboard">📊 Dashboard</button>
           <button class="tab" data-view="all">📋 Alle Einträge</button>
           <button class="tab" data-view="skills">🧠 Skills</button>
           <button class="tab" data-view="form">➕ Neuer Eintrag</button>
+          <button class="tab" data-view="quick">⚡ Schnelleingabe</button>
         </nav>
       </header>
 
@@ -402,8 +471,9 @@
           <!-- Filter-Knöpfe. data-filter = welche Kategorie gezeigt wird. -->
           <div class="filters">
             <button class="filter active" data-filter="all">Alle</button>
+            <button class="filter" data-filter="arbeit">💼 Arbeit</button>
             <button class="filter" data-filter="alltag">🏠 Alltag</button>
-            <button class="filter" data-filter="skill">🎯 Skill</button>
+            <button class="filter" data-filter="privat">👤 Privat</button>
             <button class="filter" data-filter="ziel">🏆 Langfristiges Ziel</button>
           </div>
 
@@ -413,7 +483,7 @@
       </section>
 
       <!-- ================================================================
-           ANSICHT: SKILLS (neu ergänzt)
+           ANSICHT: SKILLS
            ================================================================ -->
       <section id="view-skills" class="hidden">
         <div class="panel">
@@ -422,14 +492,29 @@
           <button class="btn primary" id="sk-new-btn">➕ Neuer Skill</button>
         </div>
 
+        <!-- Hinweis-Banner, falls alte Skills migriert wurden (per JS befüllt) -->
+        <div id="sk-migration-notice"></div>
+
         <!-- Formular für einen neuen Skill (versteckt bis "Neuer Skill") -->
         <div class="panel hidden" id="sk-form-panel">
           <h2>Neuer Skill</h2>
-          <p class="hint">Nur der Name ist Pflicht. Meilensteine kannst du auch später je Karte ergänzen.</p>
+          <p class="hint">Name und Bereich sind Pflicht. Meilensteine kannst du auch später je Karte ergänzen.</p>
 
           <div class="field">
             <label for="sk-name">Name *</label>
             <input type="text" id="sk-name" placeholder="z. B. Liegestütze" />
+          </div>
+
+          <div class="field">
+            <label for="sk-area">Bereich *</label>
+            <select id="sk-area">
+              <option value="work">💼 Beruflich</option>
+              <option value="languages">🗣️ Sprachen</option>
+              <option value="sport">🏃 Sport</option>
+              <option value="music">🎵 Musik</option>
+              <option value="reading">📚 Lesen</option>
+              <option value="creative">🎨 Kreatives</option>
+            </select>
           </div>
 
           <div class="field">
@@ -475,8 +560,9 @@
           <div class="field">
             <label for="f-category">Kategorie</label>
             <select id="f-category">
+              <option value="arbeit">💼 Arbeit</option>
               <option value="alltag">🏠 Alltag</option>
-              <option value="skill">🎯 Skill</option>
+              <option value="privat">👤 Privat</option>
               <option value="ziel">🏆 Langfristiges Ziel</option>
             </select>
           </div>
@@ -497,6 +583,43 @@
           </div>
         </div>
       </section>
+
+      <!-- ================================================================
+           ANSICHT: SCHNELLEINGABE (mehrere Aufgaben auf einmal)
+           ================================================================ -->
+      <section id="view-quick" class="hidden">
+        <div class="panel">
+          <h2>⚡ Schnelleingabe</h2>
+          <p class="hint">
+            Mehrere Aufgaben auf einmal einfügen (z. B. aus einer Mail kopiert).
+            Eine Zeile = eine Aufgabe. Eingerückte Zeilen oder Zeilen mit
+            <code>-</code>, <code>*</code>, <code>&gt;</code> werden zu Unterpunkten.
+            Marker: <code>@arbeit</code>/<code>@alltag</code>/<code>@privat</code>/<code>@ziel</code>
+            setzt die Kategorie, <code>!05.11.2026</code> oder <code>!2026-11-05</code> die Deadline.
+          </p>
+
+          <div class="field">
+            <label for="q-input">Text</label>
+            <textarea id="q-input" rows="10" style="min-height: 200px"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="q-preview-btn">👁️ Vorschau</button>
+            <button class="btn ghost" id="q-clear-btn">Leeren</button>
+          </div>
+        </div>
+
+        <!-- Vorschau-Bereich (versteckt bis "Vorschau" geklickt wurde) -->
+        <div class="panel hidden" id="q-preview-panel">
+          <h2>Vorschau</h2>
+          <p class="hint">Haken entfernen = nicht übernehmen. Titel sind direkt editierbar.</p>
+          <div id="q-preview-list"></div>
+          <div class="form-actions">
+            <button class="btn primary" id="q-apply-btn">✅ Übernehmen</button>
+            <button class="btn ghost" id="q-back-btn">Zurück</button>
+          </div>
+        </div>
+      </section>
     </div>
 
     <script>
@@ -504,7 +627,7 @@
          JAVASCRIPT — die Logik der App
          --------------------------------------------------------------------
          Ablauf:
-           A) Daten laden (aus localStorage) oder leere Liste starten
+           A) Daten laden (aus localStorage) + alte Daten migrieren
            B) Funktionen zum Speichern, Anzeigen, Erstellen, Bearbeiten, Löschen
            C) Ereignisse (Klicks) mit Funktionen verbinden
            D) Erste Anzeige aufbauen
@@ -513,67 +636,158 @@
       /* --------------------------------------------------------------------
          A) DATENMODELL & SPEICHER
          --------------------------------------------------------------------
-         Jeder Eintrag ist ein Objekt mit diesen Feldern:
-
+         Eintrag (Aufgabe / To-do):
            {
-             id:         "eindeutige-id",     // damit wir Einträge wiederfinden
-             title:      "Text",              // Titel
-             category:   "alltag"|"skill"|"ziel",
-             deadline:   "2026-09-30" | null, // Datum als Text (ISO) oder null
-             status:     "offen" | "erledigt",
-             createdAt:  "2026-09-19T10:00:00.000Z", // automatisch beim Anlegen
-             note:       "Freitext",
-             skillData:  null                 // <-- VORBEREITUNG FÜR SPÄTER
+             id, title,
+             category:  "arbeit" | "alltag" | "privat" | "ziel",
+             deadline:  "2026-11-05" | null,
+             status:    "offen" | "erledigt",
+             createdAt: "2026-10-05T10:00:00.000Z",
+             note:      "Freitext",
+             subtasks:  [ { title, done } ]   // Unterpunkte (einklappbar)
            }
 
-         WICHTIG (Vorbereitung für später):
-         Das Feld "skillData" ist bewusst schon vorhanden, bleibt aber vorerst
-         null. Später kannst du es für Skill-Einträge mit einem Objekt füllen,
-         z. B.:
-           skillData: {
-             milestones:  [ { title: "...", done: false } ],   // Meilensteine
-             practiceLog: [ { date: "...", minutes: 30, note: "" } ] // Übungs-Log
+         Skill (langfristiger Kompetenzaufbau):
+           {
+             id, name,
+             area:      "work"|"languages"|"sport"|"music"|"reading"|"creative", // Pflicht
+             direction: "Richtung/Notiz",
+             milestones:[ { id, title, done } ],
+             log:       [ { date, note } ]     // 1 Objekt je Übungseinheit
            }
-         Weil das Feld schon Teil jedes Eintrags ist, musst du das Datenmodell
-         später NICHT umbauen — du füllst "skillData" einfach mit Leben.
+
+         XP    = (Anzahl Übungseinheiten × 5) + (Anzahl erreichter Meilensteine × 20)
+         Level = XP / 100, abgerundet
          -------------------------------------------------------------------- */
 
-      // Schlüssel, unter dem wir im Browser speichern.
+      // Schlüssel, unter denen wir im Browser speichern.
       const STORAGE_KEY = "questlog.entries.v1";
+      const SKILLS_KEY  = "questlog.skills.v1";
 
-      // "entries" ist unsere Liste aller Einträge (ein Array von Objekten).
+      // Standard-Bereich für Skills, die beim Laden noch keinen "area" haben.
+      const DEFAULT_AREA = "work";
+
+      // Zählt beim Laden, wie viele alte Skills auf den Default gesetzt wurden
+      // (für den Hinweis-Banner). Muss VOR loadSkills() existieren.
+      let skillsDefaultedCount = 0;
+
+      // Lesbare Namen + Icons für Kategorien (Anzeige deutsch, Werte englisch gibt es hier nicht –
+      // die Kategorien sind bewusst deutsche Schlüssel laut Plan).
+      const CATEGORY_INFO = {
+        arbeit: { label: "Arbeit", icon: "💼" },
+        alltag: { label: "Alltag", icon: "🏠" },
+        privat: { label: "Privat", icon: "👤" },
+        ziel:   { label: "Langfristiges Ziel", icon: "🏆" },
+      };
+
+      // Lesbare Namen + Icons für Skill-Bereiche (Werte englisch, Anzeige deutsch).
+      const AREA_INFO = {
+        work:      { label: "Beruflich", icon: "💼" },
+        languages: { label: "Sprachen", icon: "🗣️" },
+        sport:     { label: "Sport", icon: "🏃" },
+        music:     { label: "Musik", icon: "🎵" },
+        reading:   { label: "Lesen", icon: "📚" },
+        creative:  { label: "Kreatives", icon: "🎨" },
+      };
+
+      // Die beiden Haupt-Datenlisten.
       let entries = loadEntries();
-
-      // "skills" ist ein EIGENES Array neben "entries" (siehe Skills-Block unten).
-      // loadSkills() ist weiter unten definiert, funktioniert hier aber schon,
-      // weil Funktions-Deklarationen in JavaScript "nach oben gezogen" werden.
       let skills = loadSkills();
 
       // Merkt sich den aktuell gewählten Kategorie-Filter in Ansicht 2.
       let activeFilter = "all";
 
-      // Liest die gespeicherten Einträge aus localStorage.
-      // Falls nichts gespeichert ist oder etwas kaputt ist, geben wir [] zurück.
+      // Merkt sich, welche Einträge ihre Unterpunkte aufgeklappt haben
+      // (damit der Zustand ein Neu-Zeichnen übersteht).
+      const expandedEntries = new Set();
+
+      // Zwischenspeicher für die Schnelleingabe-Vorschau.
+      let quickParsed = [];
+
+      /* ---- Laden + Migrieren --------------------------------------------- */
+
+      // Liest Einträge aus localStorage und bringt alte Daten auf das neue Format.
       function loadEntries() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
           if (!raw) return [];
           const data = JSON.parse(raw);
-          // Sicherheitsnetz: nur ein Array akzeptieren
-          return Array.isArray(data) ? data : [];
+          if (!Array.isArray(data)) return [];
+          return data.map(migrateEntry);
         } catch (err) {
           console.warn("Konnte Daten nicht laden:", err);
           return [];
         }
       }
 
-      // Schreibt die aktuelle Liste zurück in localStorage.
-      // JSON.stringify wandelt unsere Objekte in Text um (nur Text lässt sich speichern).
+      // Migration eines einzelnen Eintrags (verändert alte Daten verträglich):
+      //  - entfernt das tote Feld "skillData"
+      //  - alte Kategorie "skill" wird zu "ziel"
+      //  - stellt sicher, dass "subtasks" ein Array ist
+      function migrateEntry(e) {
+        const copy = Object.assign({}, e);
+        delete copy.skillData;                       // totes Feld entfernen
+        if (copy.category === "skill") copy.category = "ziel"; // skill -> ziel
+        if (!Array.isArray(copy.subtasks)) copy.subtasks = []; // neues Feld
+        return copy;
+      }
+
+      // Liest Skills aus localStorage und migriert alte Daten.
+      function loadSkills() {
+        try {
+          const raw = localStorage.getItem(SKILLS_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          if (!Array.isArray(data)) return [];
+          return data.map(migrateSkill);
+        } catch (err) {
+          console.warn("Konnte Skills nicht laden:", err);
+          return [];
+        }
+      }
+
+      // Migration eines einzelnen Skills:
+      //  - setzt fehlendes Pflichtfeld "area" auf den Default (und zählt das)
+      //  - wandelt altes Log (reine Zeitstempel-Strings) in Objekte { date, note } um
+      //  - stellt sicher, dass milestones/log Arrays sind
+      function migrateSkill(s) {
+        const copy = Object.assign({}, s);
+
+        if (!copy.area) {
+          copy.area = DEFAULT_AREA;
+          skillsDefaultedCount++;
+        }
+
+        if (!Array.isArray(copy.milestones)) copy.milestones = [];
+
+        if (Array.isArray(copy.log)) {
+          copy.log = copy.log.map((entry) =>
+            typeof entry === "string"
+              ? { date: entry, note: "" }   // alter Zeitstempel -> Objekt
+              : entry                        // schon ein Objekt -> unverändert
+          );
+        } else {
+          copy.log = [];
+        }
+
+        return copy;
+      }
+
+      // Schreibt die aktuelle Einträge-Liste zurück in localStorage.
       function saveEntries() {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
         } catch (err) {
           console.warn("Konnte Daten nicht speichern:", err);
+        }
+      }
+
+      // Schreibt die Skill-Liste zurück in localStorage.
+      function saveSkills() {
+        try {
+          localStorage.setItem(SKILLS_KEY, JSON.stringify(skills));
+        } catch (err) {
+          console.warn("Konnte Skills nicht speichern:", err);
         }
       }
 
@@ -588,16 +802,14 @@
          einfach und vermeidet Verwirrung mit Uhrzeiten/Zeitzonen.
          -------------------------------------------------------------------- */
 
-      // Gibt das heutige Datum als "YYYY-MM-DD" zurück (lokale Zeit).
       function todayISO() {
         const d = new Date();
         const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0"); // Monat 0-basiert -> +1
+        const m = String(d.getMonth() + 1).padStart(2, "0");
         const day = String(d.getDate()).padStart(2, "0");
         return `${y}-${m}-${day}`;
       }
 
-      // Gibt das Datum in "n" Tagen als "YYYY-MM-DD" zurück (z. B. +7 Tage).
       function isoInDays(n) {
         const d = new Date();
         d.setDate(d.getDate() + n);
@@ -609,14 +821,12 @@
 
       /* --------------------------------------------------------------------
          B) ANZEIGE ("Rendering")
-         Diese Funktionen bauen aus den Daten den sichtbaren HTML-Inhalt.
-         "render()" ist der zentrale Aufruf: er baut alle Ansichten neu.
          -------------------------------------------------------------------- */
 
       function render() {
         renderDashboard();
         renderAllList();
-        renderSkills(); // neu: Skill-Karten mitzeichnen
+        renderSkills();
       }
 
       // Baut Statistik-Kacheln, XP-Balken und die beiden Fällig-Listen.
@@ -625,35 +835,29 @@
         const doneCount = entries.filter((e) => e.status === "erledigt").length;
         const openCount = total - doneCount;
 
-        // Kachel-Zahlen setzen
         document.getElementById("stat-open").textContent = openCount;
         document.getElementById("stat-done").textContent = doneCount;
         document.getElementById("stat-total").textContent = total;
 
-        // XP-Balken: Anteil erledigt (in Prozent). Bei 0 Einträgen -> 0 %.
         const percent = total === 0 ? 0 : Math.round((doneCount / total) * 100);
         document.getElementById("xp-fill").style.width = percent + "%";
         document.getElementById("xp-text").textContent = `${doneCount} / ${total} (${percent}%)`;
 
-        // "Heute fällig": offen UND Deadline == heute
         const today = todayISO();
         const dueToday = entries.filter(
           (e) => e.status === "offen" && e.deadline === today
         );
 
-        // "Diese Woche fällig": offen UND Deadline zwischen heute und heute+7
         const weekEnd = isoInDays(7);
         const dueWeek = entries.filter(
           (e) =>
             e.status === "offen" &&
-            e.deadline &&                 // Deadline gesetzt
-            e.deadline >= today &&        // ab heute
-            e.deadline <= weekEnd         // bis in 7 Tagen
+            e.deadline &&
+            e.deadline >= today &&
+            e.deadline <= weekEnd
         );
-        // Innerhalb der Woche nach Datum sortieren (nächste zuerst).
         dueWeek.sort((a, b) => a.deadline.localeCompare(b.deadline));
 
-        // In die Container schreiben. Sind sie leer, zeigen wir einen Hinweis.
         renderInto("due-today", dueToday, "Heute ist nichts fällig. 🎉");
         renderInto("due-week", dueWeek, "Diese Woche steht nichts an.");
       }
@@ -664,42 +868,27 @@
         if (activeFilter !== "all") {
           list = entries.filter((e) => e.category === activeFilter);
         }
-        // Neueste zuerst: nach Erstellungsdatum absteigend sortieren.
-        // slice() erzeugt eine Kopie, damit wir das Original nicht verändern.
         list = list.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
         renderInto("all-list", list, "Keine Einträge in dieser Kategorie.");
       }
 
       // Hilfsfunktion: schreibt eine Liste von Einträgen in einen Container.
-      // containerId = ID des Ziel-Elements, list = Einträge, emptyText = Text bei leer.
       function renderInto(containerId, list, emptyText) {
         const container = document.getElementById(containerId);
-        container.innerHTML = ""; // erst leeren
-
+        container.innerHTML = "";
         if (list.length === 0) {
           container.innerHTML = `<div class="empty">${emptyText}</div>`;
           return;
         }
-
-        // Für jeden Eintrag ein HTML-Element bauen und anhängen.
-        list.forEach((entry) => {
-          container.appendChild(buildEntryElement(entry));
-        });
+        list.forEach((entry) => container.appendChild(buildEntryElement(entry)));
       }
 
-      // Baut das HTML-Element für EINEN Eintrag (Karte mit Check, Text, Knöpfen).
+      // Baut das HTML-Element für EINEN Eintrag.
       function buildEntryElement(entry) {
         const isDone = entry.status === "erledigt";
+        const catInfo = CATEGORY_INFO[entry.category] || { label: entry.category, icon: "•" };
 
-        // Lesbare Kategorie-Namen + Icons
-        const catInfo = {
-          alltag: { label: "Alltag", icon: "🏠" },
-          skill:  { label: "Skill", icon: "🎯" },
-          ziel:   { label: "Langfristiges Ziel", icon: "🏆" },
-        }[entry.category] || { label: entry.category, icon: "•" };
-
-        // Deadline-Badge vorbereiten (überfällig / heute / normales Datum).
+        // Deadline-Badge (überfällig / heute / normales Datum).
         let deadlineBadge = "";
         if (entry.deadline) {
           const today = todayISO();
@@ -712,21 +901,38 @@
           }
         }
 
-        // Notiz nur anzeigen, wenn vorhanden.
         const noteHtml = entry.note
           ? `<div class="note">${escapeHtml(entry.note)}</div>`
           : "";
 
-        // Das äußere Karten-Element erstellen.
-        const el = document.createElement("div");
-        el.className =
-          "entry cat-" + entry.category + (isDone ? " is-done" : "");
+        // Unterpunkte (einklappbar).
+        const subs = Array.isArray(entry.subtasks) ? entry.subtasks : [];
+        let subToggleHtml = "";
+        let subListHtml = "";
+        if (subs.length) {
+          const doneSubs = subs.filter((s) => s.done).length;
+          const expanded = expandedEntries.has(entry.id);
+          const arrow = expanded ? "▾" : "▸";
+          const word = subs.length === 1 ? "Unterpunkt" : "Unterpunkte";
+          subToggleHtml = `<button class="sub-toggle">${arrow} ${subs.length} ${word} (${doneSubs}/${subs.length})</button>`;
+          subListHtml =
+            `<ul class="sub-list ${expanded ? "" : "hidden"}">` +
+            subs
+              .map(
+                (s, i) => `
+              <li class="sub-item ${s.done ? "done" : ""}" data-sub="${i}">
+                <button class="sub-check" title="Unterpunkt umschalten">${s.done ? "✓" : ""}</button>
+                <span class="sub-text">${escapeHtml(s.title)}</span>
+              </li>`
+              )
+              .join("") +
+            `</ul>`;
+        }
 
-        // Inhalt der Karte. escapeHtml() schützt vor kaputtem/gefährlichem Text.
+        const el = document.createElement("div");
+        el.className = "entry cat-" + entry.category + (isDone ? " is-done" : "");
         el.innerHTML = `
-          <button class="check" title="Als erledigt/offen umschalten">
-            ${isDone ? "✓" : ""}
-          </button>
+          <button class="check" title="Als erledigt/offen umschalten">${isDone ? "✓" : ""}</button>
           <div class="body">
             <div class="row1">
               <span class="name">${escapeHtml(entry.title)}</span>
@@ -734,6 +940,8 @@
               ${deadlineBadge}
             </div>
             ${noteHtml}
+            ${subToggleHtml}
+            ${subListHtml}
             <div class="meta">Erstellt am ${formatDate(entry.createdAt)}</div>
           </div>
           <div class="actions">
@@ -742,22 +950,38 @@
           </div>
         `;
 
-        // Ereignisse dieser Karte verbinden (Check / Bearbeiten / Löschen).
+        // Standard-Ereignisse.
         el.querySelector(".check").addEventListener("click", () => toggleDone(entry.id));
         el.querySelector(".edit").addEventListener("click", () => startEdit(entry.id));
         el.querySelector(".del").addEventListener("click", () => deleteEntry(entry.id));
 
+        // Unterpunkt-Ereignisse (nur wenn es welche gibt).
+        if (subs.length) {
+          const toggleBtn = el.querySelector(".sub-toggle");
+          const listEl = el.querySelector(".sub-list");
+          const doneSubs = subs.filter((s) => s.done).length;
+          const word = subs.length === 1 ? "Unterpunkt" : "Unterpunkte";
+          toggleBtn.addEventListener("click", () => {
+            const isHidden = listEl.classList.toggle("hidden");
+            if (isHidden) expandedEntries.delete(entry.id);
+            else expandedEntries.add(entry.id);
+            toggleBtn.textContent = `${isHidden ? "▸" : "▾"} ${subs.length} ${word} (${doneSubs}/${subs.length})`;
+          });
+          el.querySelectorAll(".sub-item").forEach((li) => {
+            const idx = Number(li.dataset.sub);
+            li.querySelector(".sub-check").addEventListener("click", () => toggleSubtask(entry.id, idx));
+          });
+        }
+
         return el;
       }
 
-      // Wandelt "2026-09-19" bzw. ISO-Zeit in ein hübsches deutsches Datum um.
       function formatDate(value) {
         const d = new Date(value);
-        if (isNaN(d)) return value; // Notfall: unverändert zurückgeben
+        if (isNaN(d)) return value;
         return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
       }
 
-      // Sicherheit: ersetzt Sonderzeichen, damit Nutzertext nicht als HTML wirkt.
       function escapeHtml(text) {
         const div = document.createElement("div");
         div.textContent = text;
@@ -765,81 +989,72 @@
       }
 
       /* --------------------------------------------------------------------
-         AKTIONEN: erstellen, bearbeiten, löschen, erledigt-umschalten
+         AKTIONEN (Einträge): erstellen, bearbeiten, löschen, umschalten
          -------------------------------------------------------------------- */
 
-      // Speichert das Formular: entweder neuer Eintrag oder Änderung.
       function saveForm() {
-        const id = document.getElementById("f-id").value;          // leer = neu
+        const id = document.getElementById("f-id").value;
         const title = document.getElementById("f-title").value.trim();
         const category = document.getElementById("f-category").value;
-        const deadline = document.getElementById("f-deadline").value || null; // "" -> null
+        const deadline = document.getElementById("f-deadline").value || null;
         const note = document.getElementById("f-note").value.trim();
 
-        // Titel ist Pflicht. Ohne Titel: kurze Rückmeldung, nichts speichern.
         if (!title) {
           alert("Bitte gib einen Titel ein.");
           return;
         }
 
         if (id) {
-          // --- BEARBEITEN: vorhandenen Eintrag finden und Felder aktualisieren ---
+          // Bearbeiten: vorhandenen Eintrag aktualisieren.
           const entry = entries.find((e) => e.id === id);
           if (entry) {
             entry.title = title;
             entry.category = category;
             entry.deadline = deadline;
             entry.note = note;
-            // status, createdAt und skillData bleiben unverändert erhalten.
+            // status, createdAt und subtasks bleiben unverändert erhalten.
           }
         } else {
-          // --- NEU: ein frisches Eintrags-Objekt anlegen ---
+          // Neu: ein frisches Eintrags-Objekt anlegen.
           entries.push({
             id: makeId(),
             title: title,
             category: category,
             deadline: deadline,
-            status: "offen",                 // neue Einträge starten als "offen"
-            createdAt: new Date().toISOString(), // automatischer Zeitstempel
+            status: "offen",
+            createdAt: new Date().toISOString(),
             note: note,
-            skillData: null,                 // Platzhalter für spätere Skill-Logik
+            subtasks: [],
           });
         }
 
-        saveEntries(); // in localStorage sichern
-        resetForm();   // Formular leeren
-        render();      // Anzeige aktualisieren
-        switchView("all"); // nach dem Speichern zur Liste wechseln
+        saveEntries();
+        resetForm();
+        render();
+        switchView("all");
       }
 
-      // Öffnet das Formular vorbefüllt, um einen bestehenden Eintrag zu ändern.
       function startEdit(id) {
         const entry = entries.find((e) => e.id === id);
         if (!entry) return;
-
         document.getElementById("f-id").value = entry.id;
         document.getElementById("f-title").value = entry.title;
         document.getElementById("f-category").value = entry.category;
         document.getElementById("f-deadline").value = entry.deadline || "";
         document.getElementById("f-note").value = entry.note || "";
         document.getElementById("form-title").textContent = "Eintrag bearbeiten";
-
         switchView("form");
       }
 
-      // Löscht einen Eintrag (mit Sicherheitsabfrage).
       function deleteEntry(id) {
         const entry = entries.find((e) => e.id === id);
         if (!entry) return;
         if (!confirm(`„${entry.title}" wirklich löschen?`)) return;
-
-        // filter() behält alle Einträge, deren id NICHT die gesuchte ist.
         entries = entries.filter((e) => e.id !== id);
         saveEntries();
         render();
       }
 
-      // Schaltet einen Eintrag zwischen "offen" und "erledigt" um.
       function toggleDone(id) {
         const entry = entries.find((e) => e.id === id);
         if (!entry) return;
@@ -848,7 +1063,15 @@
         render();
       }
 
-      // Setzt das Formular auf den Ausgangszustand (leer, "neuer Eintrag").
+      // Einen Unterpunkt (subtask) erledigt/offen schalten.
+      function toggleSubtask(entryId, index) {
+        const entry = entries.find((e) => e.id === entryId);
+        if (!entry || !Array.isArray(entry.subtasks) || !entry.subtasks[index]) return;
+        entry.subtasks[index].done = !entry.subtasks[index].done;
+        saveEntries();
+        renderAllList(); // Aufklapp-Zustand bleibt über expandedEntries erhalten
+      }
+
       function resetForm() {
         document.getElementById("f-id").value = "";
         document.getElementById("f-title").value = "";
@@ -862,40 +1085,32 @@
          ANSICHTS-WECHSEL (Tabs)
          -------------------------------------------------------------------- */
 
-      // Zeigt genau eine Ansicht und markiert den passenden Tab.
       function switchView(view) {
-        // Alle Ansichten ausblenden, gewünschte einblenden.
         document.getElementById("view-dashboard").classList.toggle("hidden", view !== "dashboard");
         document.getElementById("view-all").classList.toggle("hidden", view !== "all");
         document.getElementById("view-skills").classList.toggle("hidden", view !== "skills");
         document.getElementById("view-form").classList.toggle("hidden", view !== "form");
+        document.getElementById("view-quick").classList.toggle("hidden", view !== "quick");
 
-        // Aktiven Tab markieren.
         document.querySelectorAll(".tab").forEach((tab) => {
           tab.classList.toggle("active", tab.dataset.view === view);
         });
 
-        // Beim Verlassen des Formulars setzen wir es zurück,
-        // damit ein danach geklicktes "Neuer Eintrag" wirklich leer ist.
         if (view !== "form") resetForm();
-        // Verlassen wir die Skills-Ansicht, klappen wir das Skill-Formular zu.
         if (view !== "skills") hideSkillForm();
       }
 
       /* --------------------------------------------------------------------
-         C) EREIGNISSE VERBINDEN (Klicks etc.)
+         C) EREIGNISSE VERBINDEN
          -------------------------------------------------------------------- */
 
-      // Tab-Klicks: zur jeweiligen Ansicht wechseln.
       document.querySelectorAll(".tab").forEach((tab) => {
         tab.addEventListener("click", () => switchView(tab.dataset.view));
       });
 
-      // Filter-Klicks in Ansicht 2: Kategorie setzen und Liste neu bauen.
       document.querySelectorAll(".filter").forEach((btn) => {
         btn.addEventListener("click", () => {
           activeFilter = btn.dataset.filter;
-          // aktiven Filter-Knopf hervorheben
           document.querySelectorAll(".filter").forEach((b) =>
             b.classList.toggle("active", b === btn)
           );
@@ -903,78 +1118,31 @@
         });
       });
 
-      // Formular-Knöpfe.
       document.getElementById("f-save").addEventListener("click", saveForm);
       document.getElementById("f-cancel").addEventListener("click", () => {
         resetForm();
         switchView("all");
       });
-
-      // Komfort: im Titelfeld mit Enter direkt speichern.
       document.getElementById("f-title").addEventListener("keydown", (e) => {
         if (e.key === "Enter") saveForm();
       });
 
       /* ====================================================================
-         SKILLS — neu ergänzter Bereich (verändert NICHTS am Bestehenden)
-         --------------------------------------------------------------------
-         Skills liegen in einem EIGENEN Array "skills" und einem EIGENEN
-         localStorage-Schlüssel. Die Alltag-/Langfristig-Logik oben bleibt
-         komplett unberührt.
-
-         Datenmodell eines Skills:
-           {
-             id:        "sk-id",
-             name:      "Liegestütze",
-             direction: "Kraft aufbauen Richtung 100 Liegestütze", // Richtung/Notiz
-             milestones:[ { id, title: "20 am Stück", done: false } ],
-             log:       [ "2026-09-19T10:00:00.000Z", ... ]  // 1 Zeitstempel je Einheit
-           }
-
-         Berechnung:
-           XP    = (Anzahl Übungseinheiten × 5) + (Anzahl erreichter Meilensteine × 20)
-           Level = XP / 100, abgerundet
+         SKILLS
          ==================================================================== */
 
-      const SKILLS_KEY = "questlog.skills.v1";
-
-      // Lädt Skills aus localStorage (mit Sicherheitsnetz), analog zu loadEntries().
-      function loadSkills() {
-        try {
-          const raw = localStorage.getItem(SKILLS_KEY);
-          if (!raw) return [];
-          const data = JSON.parse(raw);
-          return Array.isArray(data) ? data : [];
-        } catch (err) {
-          console.warn("Konnte Skills nicht laden:", err);
-          return [];
-        }
-      }
-
-      // Speichert die Skill-Liste zurück in localStorage.
-      function saveSkills() {
-        try {
-          localStorage.setItem(SKILLS_KEY, JSON.stringify(skills));
-        } catch (err) {
-          console.warn("Konnte Skills nicht speichern:", err);
-        }
-      }
-
-      // --- Berechnungen ----------------------------------------------------
       function skillXp(skill) {
-        const units = skill.log.length;                               // Übungseinheiten
-        const reached = skill.milestones.filter((m) => m.done).length; // erreichte Meilensteine
+        const units = skill.log.length;
+        const reached = skill.milestones.filter((m) => m.done).length;
         return units * 5 + reached * 20;
       }
       function skillLevel(skill) {
         return Math.floor(skillXp(skill) / 100);
       }
 
-      // --- Anzeige: alle Skill-Karten bauen --------------------------------
       function renderSkills() {
         const list = document.getElementById("sk-list");
         list.innerHTML = "";
-
         if (skills.length === 0) {
           list.innerHTML =
             '<div class="panel"><div class="empty">Noch keine Skills. Klicke oben auf „Neuer Skill".</div></div>';
@@ -983,16 +1151,35 @@
         skills.forEach((skill) => list.appendChild(buildSkillCard(skill)));
       }
 
-      // Baut die Karte für EINEN Skill.
+      // Zeigt (einmalig) einen Hinweis, wenn beim Laden Skills migriert wurden.
+      function renderMigrationNotice() {
+        const box = document.getElementById("sk-migration-notice");
+        if (skillsDefaultedCount > 0) {
+          const n = skillsDefaultedCount;
+          box.innerHTML = `
+            <div class="notice">
+              <span>ℹ️ ${n} bestehende${n === 1 ? "r" : ""} Skill${n === 1 ? "" : "s"} wurde${n === 1 ? "" : "n"} auf den
+              Standard-Bereich „Beruflich" gesetzt, weil noch kein Bereich hinterlegt war.
+              Bitte pro Karte den passenden Bereich wählen.</span>
+              <button id="sk-notice-dismiss">OK</button>
+            </div>`;
+          document.getElementById("sk-notice-dismiss").addEventListener("click", () => {
+            box.innerHTML = "";
+          });
+        } else {
+          box.innerHTML = "";
+        }
+      }
+
       function buildSkillCard(skill) {
         const xp = skillXp(skill);
         const level = skillLevel(skill);
-        const intoLevel = xp % 100; // XP-Fortschritt innerhalb des aktuellen Levels (0–99)
+        const intoLevel = xp % 100;
+        const areaInfo = AREA_INFO[skill.area] || { label: skill.area || "–", icon: "•" };
 
         const card = document.createElement("div");
         card.className = "skill-card";
 
-        // Meilensteine als HTML-Liste (jeweils mit Checkbox und Löschen-Knopf).
         const msHtml = skill.milestones
           .map(
             (m) => `
@@ -1004,16 +1191,22 @@
           )
           .join("");
 
-        // Historie: die letzten 5 Einheiten (neueste zuerst).
+        // Historie: letzte 5 Einheiten (neueste zuerst), jeweils mit optionaler Notiz.
         const recent = skill.log.slice().reverse().slice(0, 5);
         const histHtml = recent.length
-          ? recent.map((ts) => `<span class="h-item">🗓️ ${formatDate(ts)}</span>`).join("")
+          ? recent
+              .map(
+                (e) =>
+                  `<span class="h-item">🗓️ ${formatDate(e.date)}${e.note ? " · " + escapeHtml(e.note) : ""}</span>`
+              )
+              .join("")
           : '<span class="h-empty">Noch keine Einheit eingetragen.</span>';
 
         card.innerHTML = `
           <div class="skill-head">
             <div>
               <div class="skill-name">🎯 ${escapeHtml(skill.name)}</div>
+              <div style="margin-top:4px"><span class="badge area">${areaInfo.icon} ${areaInfo.label}</span></div>
               ${skill.direction ? `<div class="skill-dir">${escapeHtml(skill.direction)}</div>` : ""}
             </div>
             <button class="icon-btn del sk-del" title="Skill löschen">🗑️</button>
@@ -1037,6 +1230,7 @@
           </div>
 
           <div class="skill-actions">
+            <input type="text" class="unit-note-input" placeholder="Notiz zur Einheit (optional)" />
             <button class="unit-btn">🏋️ Übungseinheit eintragen</button>
             <span class="unit-count">${skill.log.length} Einheit${skill.log.length === 1 ? "" : "en"} · +5 XP je Einheit</span>
           </div>
@@ -1047,18 +1241,19 @@
           </div>
         `;
 
-        // --- Ereignisse dieser Karte verbinden ---
-        card.querySelector(".unit-btn").addEventListener("click", () => addUnit(skill.id));
+        // Übungseinheit eintragen (liest das optionale Notizfeld der Karte).
+        const noteInput = card.querySelector(".unit-note-input");
+        card.querySelector(".unit-btn").addEventListener("click", () => {
+          addUnit(skill.id, noteInput.value);
+        });
         card.querySelector(".sk-del").addEventListener("click", () => deleteSkill(skill.id));
 
-        // Für jeden Meilenstein: umschalten und löschen.
         card.querySelectorAll(".ms-item").forEach((li) => {
           const msId = li.dataset.ms;
           li.querySelector(".ms-check").addEventListener("click", () => toggleMilestone(skill.id, msId));
           li.querySelector(".ms-del").addEventListener("click", () => deleteMilestone(skill.id, msId));
         });
 
-        // Meilenstein hinzufügen (per Knopf oder Enter im Eingabefeld).
         const addInput = card.querySelector(".ms-add-input");
         const addBtn = card.querySelector(".ms-add-btn");
         const doAdd = () => addMilestone(skill.id, addInput.value);
@@ -1068,18 +1263,15 @@
         return card;
       }
 
-      // --- Aktionen --------------------------------------------------------
-
-      // Übungseinheit eintragen: aktuellen Zeitstempel ans Log hängen (+5 XP).
-      function addUnit(skillId) {
+      // Übungseinheit eintragen: Objekt { date, note } ans Log hängen (+5 XP).
+      function addUnit(skillId, note) {
         const skill = skills.find((s) => s.id === skillId);
         if (!skill) return;
-        skill.log.push(new Date().toISOString());
+        skill.log.push({ date: new Date().toISOString(), note: (note || "").trim() });
         saveSkills();
         renderSkills();
       }
 
-      // Meilenstein erreicht/offen umschalten (erreicht = +20 XP).
       function toggleMilestone(skillId, msId) {
         const skill = skills.find((s) => s.id === skillId);
         if (!skill) return;
@@ -1090,7 +1282,6 @@
         renderSkills();
       }
 
-      // Neuen Meilenstein zu einem Skill hinzufügen.
       function addMilestone(skillId, title) {
         const clean = (title || "").trim();
         if (!clean) return;
@@ -1101,7 +1292,6 @@
         renderSkills();
       }
 
-      // Einen Meilenstein löschen.
       function deleteMilestone(skillId, msId) {
         const skill = skills.find((s) => s.id === skillId);
         if (!skill) return;
@@ -1110,7 +1300,6 @@
         renderSkills();
       }
 
-      // Einen ganzen Skill löschen (mit Sicherheitsabfrage).
       function deleteSkill(skillId) {
         const skill = skills.find((s) => s.id === skillId);
         if (!skill) return;
@@ -1120,7 +1309,7 @@
         renderSkills();
       }
 
-      // --- Formular für neuen Skill ---------------------------------------
+      /* ---- Skill-Formular ------------------------------------------------ */
       function showSkillForm() {
         document.getElementById("sk-form-panel").classList.remove("hidden");
         document.getElementById("sk-name").focus();
@@ -1131,21 +1320,20 @@
       }
       function resetSkillForm() {
         document.getElementById("sk-name").value = "";
+        document.getElementById("sk-area").value = DEFAULT_AREA;
         document.getElementById("sk-direction").value = "";
         document.querySelectorAll(".sk-ms-input").forEach((inp) => (inp.value = ""));
       }
       function saveSkillForm() {
         const name = document.getElementById("sk-name").value.trim();
+        const area = document.getElementById("sk-area").value;
         const direction = document.getElementById("sk-direction").value.trim();
 
-        // Name ist Pflicht.
         if (!name) {
           alert("Bitte gib einen Namen für den Skill ein.");
           return;
         }
 
-        // Bis zu 3 erste Meilensteine aus den Eingabefeldern einsammeln
-        // (leere Felder werden ignoriert).
         const milestones = [];
         document.querySelectorAll(".sk-ms-input").forEach((inp) => {
           const t = inp.value.trim();
@@ -1155,9 +1343,10 @@
         skills.push({
           id: makeId(),
           name: name,
+          area: area,          // Pflichtfeld
           direction: direction,
           milestones: milestones,
-          log: [], // noch keine Übungseinheiten
+          log: [],
         });
 
         saveSkills();
@@ -1165,15 +1354,217 @@
         renderSkills();
       }
 
-      // Skill-Formular-Knöpfe verbinden.
       document.getElementById("sk-new-btn").addEventListener("click", showSkillForm);
       document.getElementById("sk-save").addEventListener("click", saveSkillForm);
       document.getElementById("sk-cancel").addEventListener("click", hideSkillForm);
 
+      /* ====================================================================
+         SCHNELLEINGABE (Parser + Vorschau)
+         --------------------------------------------------------------------
+         Regeln:
+           - Zeile ohne Einrückung         = neue Aufgabe
+           - Zeile eingerückt ODER mit -,*,> = Unterpunkt der Aufgabe darüber
+           - Leere Zeilen werden ignoriert
+           - @arbeit / @alltag / @privat / @ziel setzt die Kategorie
+           - !05.11.2026 oder !2026-11-05 setzt die Deadline
+           - Diese Marker werden aus dem Titel entfernt
+         ==================================================================== */
+
+      // Wandelt "05.11.2026" -> "2026-11-05"; ISO-Datum bleibt unverändert.
+      function normalizeDate(s) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (m) {
+          const day = m[1].padStart(2, "0");
+          const mon = m[2].padStart(2, "0");
+          return `${m[3]}-${mon}-${day}`;
+        }
+        return null;
+      }
+
+      // Zieht Kategorie- und Deadline-Marker aus einem Text und entfernt sie.
+      function extractMarkers(text) {
+        let title = text;
+        let category = null;
+        let deadline = null;
+
+        const catMatch = title.match(/@(arbeit|alltag|privat|ziel)\b/i);
+        if (catMatch) {
+          category = catMatch[1].toLowerCase();
+          title = title.replace(catMatch[0], "");
+        }
+
+        const dlMatch = title.match(/!(\d{1,2}\.\d{1,2}\.\d{4}|\d{4}-\d{2}-\d{2})/);
+        if (dlMatch) {
+          deadline = normalizeDate(dlMatch[1]);
+          title = title.replace(dlMatch[0], "");
+        }
+
+        title = title.replace(/\s+/g, " ").trim();
+        return { title, category, deadline };
+      }
+
+      // Zerlegt den gesamten Eingabetext in Aufgaben (mit Unterpunkten).
+      function parseQuickInput(text) {
+        const lines = text.split(/\r?\n/);
+        const tasks = [];
+        let current = null;
+
+        for (const raw of lines) {
+          if (raw.trim() === "") continue; // leere Zeilen ignorieren
+
+          const hasIndent = /^\s+/.test(raw);              // beginnt mit Leerzeichen/Tab
+          const bulletMatch = raw.match(/^\s*[-*>]\s?(.*)$/); // beginnt mit - , * oder >
+          const isSub = hasIndent || !!bulletMatch;
+
+          // Reinen Inhalt bestimmen (Aufzählungszeichen entfernen).
+          let content = bulletMatch ? bulletMatch[1] : raw;
+          const parsed = extractMarkers(content.trim());
+
+          if (parsed.title === "") continue; // nach Marker-Entfernung nichts übrig
+
+          if (isSub && current) {
+            // Unterpunkt der aktuellen Aufgabe.
+            current.subtasks.push({ title: parsed.title, done: false });
+          } else {
+            // Neue Aufgabe.
+            current = {
+              title: parsed.title,
+              category: parsed.category || "alltag", // Default, wenn kein Marker
+              deadline: parsed.deadline || null,
+              subtasks: [],
+              include: true, // in der Vorschau standardmäßig ausgewählt
+            };
+            tasks.push(current);
+          }
+        }
+        return tasks;
+      }
+
+      // Baut die Vorschau-Karten aus quickParsed.
+      function renderQuickPreview() {
+        const box = document.getElementById("q-preview-list");
+        box.innerHTML = "";
+
+        if (quickParsed.length === 0) {
+          box.innerHTML = `<div class="empty">Nichts erkannt. Schreibe mindestens eine Zeile.</div>`;
+          return;
+        }
+
+        quickParsed.forEach((task, i) => {
+          const catInfo = CATEGORY_INFO[task.category] || { label: task.category, icon: "•" };
+
+          const deadlineBadge = task.deadline
+            ? `<span class="badge">📅 ${formatDate(task.deadline)}</span>`
+            : "";
+
+          const subHtml = task.subtasks.length
+            ? `<ul class="q-sub-list">${task.subtasks
+                .map((s) => `<li>${escapeHtml(s.title)}</li>`)
+                .join("")}</ul>`
+            : "";
+
+          const row = document.createElement("div");
+          row.className = "q-task" + (task.include ? "" : " excluded");
+          row.innerHTML = `
+            <input type="checkbox" class="q-include" ${task.include ? "checked" : ""} />
+            <div class="q-task-body">
+              <input type="text" class="q-title-input" value="${escapeHtml(task.title)}" />
+              <div class="q-meta">
+                <span class="badge cat-${task.category}">${catInfo.icon} ${catInfo.label}</span>
+                ${deadlineBadge}
+              </div>
+              ${subHtml}
+            </div>
+          `;
+
+          // Checkbox: ein-/ausschließen.
+          const cb = row.querySelector(".q-include");
+          cb.addEventListener("change", () => {
+            task.include = cb.checked;
+            row.classList.toggle("excluded", !cb.checked);
+          });
+
+          // Titel korrigierbar.
+          const titleInput = row.querySelector(".q-title-input");
+          titleInput.addEventListener("input", () => {
+            task.title = titleInput.value;
+          });
+
+          box.appendChild(row);
+        });
+      }
+
+      // "Vorschau"-Knopf: Text parsen und Vorschau zeigen.
+      function previewQuick() {
+        const text = document.getElementById("q-input").value;
+        quickParsed = parseQuickInput(text);
+        renderQuickPreview();
+        document.getElementById("q-preview-panel").classList.remove("hidden");
+      }
+
+      // "Übernehmen": ausgewählte Aufgaben als echte Einträge speichern.
+      function applyQuick() {
+        const selected = quickParsed.filter((t) => t.include && t.title.trim() !== "");
+        if (selected.length === 0) {
+          alert("Keine Aufgaben ausgewählt.");
+          return;
+        }
+
+        selected.forEach((t) => {
+          entries.push({
+            id: makeId(),
+            title: t.title.trim(),
+            category: t.category,
+            deadline: t.deadline,
+            status: "offen",
+            createdAt: new Date().toISOString(),
+            note: "",
+            subtasks: t.subtasks.map((s) => ({ title: s.title, done: false })),
+          });
+        });
+
+        saveEntries();
+        clearQuick();
+        render();
+        switchView("all");
+      }
+
+      // Setzt die Schnelleingabe zurück (Text + Vorschau).
+      function clearQuick() {
+        document.getElementById("q-input").value = "";
+        quickParsed = [];
+        document.getElementById("q-preview-list").innerHTML = "";
+        document.getElementById("q-preview-panel").classList.add("hidden");
+      }
+
+      // Beispiel-Platzhaltertext, der die Syntax zeigt.
+      document.getElementById("q-input").placeholder =
+        "Kunde Müller: Unterlagen senden @arbeit !05.11.2026\n" +
+        "  Angebot prüfen\n" +
+        "  Rückruf vereinbaren\n" +
+        "Einkaufen @alltag\n" +
+        "- Milch\n" +
+        "- Brot\n" +
+        "100 Liegestütze schaffen @ziel";
+
+      document.getElementById("q-preview-btn").addEventListener("click", previewQuick);
+      document.getElementById("q-clear-btn").addEventListener("click", clearQuick);
+      document.getElementById("q-apply-btn").addEventListener("click", applyQuick);
+      document.getElementById("q-back-btn").addEventListener("click", () => {
+        document.getElementById("q-preview-panel").classList.add("hidden");
+      });
+
       /* --------------------------------------------------------------------
-         D) START: erste Anzeige aufbauen
+         D) START: Migrationen sichern + erste Anzeige aufbauen
          -------------------------------------------------------------------- */
+      // Beim Laden ggf. migrierte Daten einmal zurückschreiben, damit die
+      // Bereinigung (z. B. entferntes skillData) dauerhaft gespeichert ist.
+      saveEntries();
+      saveSkills();
+
       render();
+      renderMigrationNotice();
     </script>
   </body>
 </html>

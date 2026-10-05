@@ -45,10 +45,10 @@
         --radius:        12px;     /* Standard-Eckenrundung */
         --shadow:        0 8px 24px rgba(0, 0, 0, 0.4);
 
-        /* Kategorie-Farben (eine je Aufgaben-Kategorie) */
-        --cat-arbeit:    #22d3ee;  /* Cyan */
-        --cat-alltag:    #a855f7;  /* Violett */
-        --cat-privat:    #f472b6;  /* Pink */
+        /* Kategorie-Farben (an EINER Stelle änderbar, überall konsistent) */
+        --cat-arbeit:    #3b82f6;  /* Blau */
+        --cat-alltag:    #a855f7;  /* Violett (ohne eigene Dashboard-Kachel) */
+        --cat-privat:    #34d399;  /* Grün */
         --cat-ziel:      #fbbf24;  /* Amber */
       }
 
@@ -427,10 +427,57 @@
       /* Leer-Kästchen vor dem Monatsersten (für die Wochentags-Ausrichtung) */
       .mg-cell.blank { background: transparent; border: none; }
 
-      /* Auf schmalen Bildschirmen die 3 Statistik-Kacheln enger stapeln */
+      /* ====================================================================
+         9) DASHBOARD: Kategorie-Kacheln, kompakte Zeilen, Habit-Chips
+         ==================================================================== */
+      /* Zähler-Kacheln (eine Reihe, anklickbar) */
+      .cat-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+      .cat-tile {
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-top: 3px solid var(--border); border-radius: 10px;
+        padding: 8px 6px; text-align: center; cursor: pointer; color: var(--text);
+        font-family: inherit;
+      }
+      .cat-tile .ct-num { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+      .cat-tile .ct-lbl { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+      /* je Kategorie die passende Farbe (Oberkante + Zahl) */
+      .cat-tile.cat-arbeit { border-top-color: var(--cat-arbeit); }
+      .cat-tile.cat-arbeit .ct-num { color: var(--cat-arbeit); }
+      .cat-tile.cat-privat { border-top-color: var(--cat-privat); }
+      .cat-tile.cat-privat .ct-num { color: var(--cat-privat); }
+      .cat-tile.cat-ziel { border-top-color: var(--cat-ziel); }
+      .cat-tile.cat-ziel .ct-num { color: var(--cat-ziel); }
+      /* aktive (angetippte) Kachel */
+      .cat-tile.active { border-color: var(--text); box-shadow: inset 0 0 0 2px rgba(230, 237, 243, 0.12); }
+
+      /* Kompaktere Zeile fürs Dashboard */
+      .entry.compact { padding: 8px 12px; margin-top: 8px; gap: 10px; }
+      .entry.compact .check { width: 22px; height: 22px; }
+
+      /* "+N weitere"-Button */
+      .more-btn {
+        margin-top: 8px; width: 100%;
+        background: var(--surface-2); color: var(--accent);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 7px 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      }
+      .more-btn:hover { border-color: var(--accent); }
+
+      /* Habit-Chips (schmal, statt großer Karten) */
+      .habit-chips { display: flex; flex-wrap: wrap; }
+      .habit-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 5px 10px; margin: 0 6px 6px 0;
+        font-size: 0.82rem; color: var(--text); cursor: pointer; font-family: inherit;
+      }
+      .habit-chip:hover { border-color: var(--success); }
+      .habit-chip .chip-check { color: var(--success); }
+      .habit-chip .chip-streak { color: var(--text-dim); font-size: 0.75rem; }
+
+      /* Auf schmalen Bildschirmen die Kachel-Zahlen etwas kleiner */
       @media (max-width: 520px) {
-        .stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-        .stat .num { font-size: 1.4rem; }
+        .cat-tile .ct-num { font-size: 1.3rem; }
       }
     </style>
   </head>
@@ -466,53 +513,40 @@
            ANSICHT 1: DASHBOARD
            ================================================================ -->
       <section id="view-dashboard">
-        <!-- Statistik-Kacheln + XP-Balken -->
+        <!-- Kompakte Tagesübersicht: Kategorie-Kacheln + Aufgaben + Habits.
+             Ziel: Kacheln, heutige Aufgaben und Habits ohne Scrollen sichtbar. -->
         <div class="panel">
-          <h2>Übersicht</h2>
-          <p class="hint">Dein Fortschritt auf einen Blick.</p>
+          <h2>🔥 Heute</h2>
+          <p class="hint">
+            Überfällige zuerst, dann heute fällige, dann der Rest.
+            Tippe eine Kachel, um die Liste auf die Kategorie zu filtern.
+          </p>
 
-          <div class="stats">
-            <div class="stat open">
-              <div class="num" id="stat-open">0</div>
-              <div class="lbl">Offen</div>
-            </div>
-            <div class="stat done">
-              <div class="num" id="stat-done">0</div>
-              <div class="lbl">Erledigt</div>
-            </div>
-            <div class="stat total">
-              <div class="num" id="stat-total">0</div>
-              <div class="lbl">Gesamt</div>
-            </div>
+          <!-- Zähler-Kacheln pro Kategorie (Arbeit/Privat/Ziele), per JS gefüllt -->
+          <div class="cat-tiles" id="cat-tiles"></div>
+
+          <!-- Tagesliste (max. 5 sichtbar, Rest hinter "+N weitere") -->
+          <div id="day-list"></div>
+          <button class="more-btn hidden" id="day-more"></button>
+
+          <!-- Heute fällige Habits als schmale Chips -->
+          <div id="due-habits-wrap" class="hidden">
+            <div class="block-sub">🔁 Habits heute</div>
+            <div id="due-habits" class="habit-chips"></div>
           </div>
+        </div>
 
-          <!-- XP-Balken: Anteil erledigter Einträge -->
+        <!-- Fortschritt gesamt + Wochenvorschau (weiter unten, darf scrollen) -->
+        <div class="panel">
           <div class="xp">
             <div class="xp-label">
-              <span>Fortschritt</span>
+              <span>Fortschritt gesamt</span>
               <span id="xp-text">0 / 0</span>
             </div>
             <div class="bar"><div class="fill" id="xp-fill"></div></div>
           </div>
-        </div>
 
-        <!-- Heute fällig -->
-        <div class="panel">
-          <h2>🔥 Heute fällig</h2>
-          <p class="hint">Einträge mit Deadline heute (noch offen).</p>
-          <div id="due-today"></div>
-
-          <!-- Heute fällige Habits erscheinen hier neben den Aufgaben.
-               Der Block wird nur gezeigt, wenn es fällige Habits gibt. -->
-          <div id="due-habits-wrap" class="hidden">
-            <div class="block-sub">🔁 Habits heute</div>
-            <div id="due-habits"></div>
-          </div>
-        </div>
-
-        <!-- Diese Woche fällig -->
-        <div class="panel">
-          <h2>🗓️ Diese Woche fällig</h2>
+          <h2 style="margin-top: 18px">🗓️ Diese Woche fällig</h2>
           <p class="hint">Offene Einträge mit Deadline in den nächsten 7 Tagen.</p>
           <div id="due-week"></div>
         </div>
@@ -862,6 +896,11 @@
       // Merkt sich den aktuell gewählten Kategorie-Filter in Ansicht 2.
       let activeFilter = "all";
 
+      // Dashboard-Zustand: aktive Kachel-Filterung und ob die Tagesliste
+      // aufgeklappt ("+N weitere") ist.
+      let dashFilter = null;        // null | "arbeit" | "privat" | "ziel"
+      let dayListExpanded = false;
+
       // Merkt sich, welche Einträge ihre Unterpunkte aufgeklappt haben
       // (damit der Zustand ein Neu-Zeichnen übersteht).
       const expandedEntries = new Set();
@@ -1004,47 +1043,148 @@
 
       // Baut Statistik-Kacheln, XP-Balken und die beiden Fällig-Listen.
       function renderDashboard() {
+        renderCatTiles();
+        renderDayList();
+        renderDashHabits();
+        renderWeekAndXp();
+      }
+
+      // Priorität einer Aufgabe für die Tagesliste: 0=überfällig, 1=heute, 2=Rest.
+      function dayBucket(e) {
+        const today = todayISO();
+        if (e.deadline && e.deadline < today) return 0;
+        if (e.deadline === today) return 1;
+        return 2;
+      }
+
+      // Reihenfolge der Kategorien innerhalb eines Prioritäts-Blocks (Arbeit zuerst).
+      const DAY_CAT_ORDER = { arbeit: 0, privat: 1, ziel: 2, alltag: 3 };
+
+      // Zähler-Kacheln (nur Arbeit/Privat/Ziele). Zahl = heute offene Aufgaben
+      // der Kategorie (überfällig oder heute fällig). Klick filtert die Tagesliste.
+      function renderCatTiles() {
+        const box = document.getElementById("cat-tiles");
+        const today = todayISO();
+        const tiles = [
+          { key: "arbeit", label: "Arbeit", icon: "💼" },
+          { key: "privat", label: "Privat", icon: "👤" },
+          { key: "ziel", label: "Ziele", icon: "🏆" },
+        ];
+        box.innerHTML = "";
+        tiles.forEach((t) => {
+          // "heute offen" = offen UND Deadline <= heute (überfällig oder heute).
+          const count = entries.filter(
+            (e) =>
+              e.status === "offen" &&
+              e.category === t.key &&
+              e.deadline &&
+              e.deadline <= today
+          ).length;
+
+          const el = document.createElement("button");
+          el.className = "cat-tile cat-" + t.key + (dashFilter === t.key ? " active" : "");
+          el.innerHTML = `<div class="ct-num">${count}</div><div class="ct-lbl">${t.icon} ${t.label}</div>`;
+          el.addEventListener("click", () => {
+            // Zweiter Klick auf dieselbe Kachel hebt den Filter wieder auf.
+            dashFilter = dashFilter === t.key ? null : t.key;
+            dayListExpanded = false; // beim Filterwechsel wieder einklappen
+            renderCatTiles();
+            renderDayList();
+          });
+          box.appendChild(el);
+        });
+      }
+
+      // Tagesliste: alle offenen Aufgaben, priorisiert (und ggf. gefiltert),
+      // max. 5 sichtbar, Rest hinter "+N weitere".
+      function renderDayList() {
+        const container = document.getElementById("day-list");
+        const moreBtn = document.getElementById("day-more");
+        container.innerHTML = "";
+
+        let list = entries.filter((e) => e.status === "offen");
+        if (dashFilter) list = list.filter((e) => e.category === dashFilter);
+
+        // Sortierung: Priorität (überfällig->heute->Rest), dann Kategorie (Arbeit
+        // zuerst), dann Deadline (ohne Deadline ans Ende), dann Erstellungsdatum.
+        list = list.slice().sort((a, b) => {
+          if (dayBucket(a) !== dayBucket(b)) return dayBucket(a) - dayBucket(b);
+          const ca = DAY_CAT_ORDER[a.category] ?? 9;
+          const cb = DAY_CAT_ORDER[b.category] ?? 9;
+          if (ca !== cb) return ca - cb;
+          const da = a.deadline || "9999-12-31";
+          const db = b.deadline || "9999-12-31";
+          if (da !== db) return da.localeCompare(db);
+          return a.createdAt.localeCompare(b.createdAt);
+        });
+
+        if (list.length === 0) {
+          container.innerHTML = `<div class="empty">${
+            dashFilter ? "Keine offenen Aufgaben in dieser Kategorie." : "Nichts offen. 🎉"
+          }</div>`;
+          moreBtn.classList.add("hidden");
+          return;
+        }
+
+        const LIMIT = 5;
+        const visible = dayListExpanded ? list : list.slice(0, LIMIT);
+        visible.forEach((e) => container.appendChild(buildEntryElement(e, true)));
+
+        // "+N weitere" nur, wenn es mehr als 5 gibt.
+        const extra = list.length - LIMIT;
+        if (extra > 0) {
+          moreBtn.classList.remove("hidden");
+          moreBtn.textContent = dayListExpanded ? "▲ Weniger anzeigen" : `+${extra} weitere`;
+        } else {
+          moreBtn.classList.add("hidden");
+        }
+      }
+
+      // Heute fällige Habits als schmale Chips (Name + Streak), nicht als Karten.
+      function renderDashHabits() {
+        const wrap = document.getElementById("due-habits-wrap");
+        const box = document.getElementById("due-habits");
+        box.innerHTML = "";
+        const due = habits.filter(isHabitDueToday);
+        if (due.length === 0) {
+          wrap.classList.add("hidden");
+          return;
+        }
+        wrap.classList.remove("hidden");
+        due.forEach((h) => box.appendChild(buildHabitChip(h)));
+      }
+
+      function buildHabitChip(habit) {
+        const chip = document.createElement("button");
+        chip.className = "habit-chip";
+        const streakLabel =
+          habit.frequency === "daily"
+            ? `🔥 ${dailyStreak(habit)}`
+            : `${weeklyCount(habit)}/${habit.timesPerWeek || 1}`;
+        chip.innerHTML =
+          `<span class="chip-check">○</span>` +
+          `<span>${escapeHtml(habit.name)}</span>` +
+          `<span class="chip-streak">${streakLabel}</span>`;
+        // Klick = heute abhaken (zahlt ggf. XP in den verknüpften Skill ein).
+        chip.addEventListener("click", () => toggleHabitToday(habit.id));
+        return chip;
+      }
+
+      // Fortschrittsbalken (gesamt) + Wochenvorschau.
+      function renderWeekAndXp() {
         const total = entries.length;
         const doneCount = entries.filter((e) => e.status === "erledigt").length;
-        const openCount = total - doneCount;
-
-        document.getElementById("stat-open").textContent = openCount;
-        document.getElementById("stat-done").textContent = doneCount;
-        document.getElementById("stat-total").textContent = total;
-
         const percent = total === 0 ? 0 : Math.round((doneCount / total) * 100);
         document.getElementById("xp-fill").style.width = percent + "%";
         document.getElementById("xp-text").textContent = `${doneCount} / ${total} (${percent}%)`;
 
         const today = todayISO();
-        const dueToday = entries.filter(
-          (e) => e.status === "offen" && e.deadline === today
-        );
-
         const weekEnd = isoInDays(7);
         const dueWeek = entries.filter(
-          (e) =>
-            e.status === "offen" &&
-            e.deadline &&
-            e.deadline >= today &&
-            e.deadline <= weekEnd
+          (e) => e.status === "offen" && e.deadline && e.deadline >= today && e.deadline <= weekEnd
         );
         dueWeek.sort((a, b) => a.deadline.localeCompare(b.deadline));
-
-        renderInto("due-today", dueToday, "Heute ist nichts fällig. 🎉");
         renderInto("due-week", dueWeek, "Diese Woche steht nichts an.");
-
-        // Heute fällige Habits (noch nicht erledigt) in der Tagesübersicht zeigen.
-        const dueHabits = habits.filter(isHabitDueToday);
-        const wrap = document.getElementById("due-habits-wrap");
-        const box = document.getElementById("due-habits");
-        box.innerHTML = "";
-        if (dueHabits.length === 0) {
-          wrap.classList.add("hidden"); // kein Block, wenn nichts fällig
-        } else {
-          wrap.classList.remove("hidden");
-          dueHabits.forEach((h) => box.appendChild(buildHabitDashboardRow(h)));
-        }
       }
 
       // Baut die Liste in Ansicht 2, gefiltert nach der gewählten Kategorie.
@@ -1069,7 +1209,8 @@
       }
 
       // Baut das HTML-Element für EINEN Eintrag.
-      function buildEntryElement(entry) {
+      // compact=true: schlankere Zeile fürs Dashboard (ohne "Erstellt am"-Zeile).
+      function buildEntryElement(entry, compact) {
         const isDone = entry.status === "erledigt";
         const catInfo = CATEGORY_INFO[entry.category] || { label: entry.category, icon: "•" };
 
@@ -1115,7 +1256,8 @@
         }
 
         const el = document.createElement("div");
-        el.className = "entry cat-" + entry.category + (isDone ? " is-done" : "");
+        el.className =
+          "entry cat-" + entry.category + (isDone ? " is-done" : "") + (compact ? " compact" : "");
         el.innerHTML = `
           <button class="check" title="Als erledigt/offen umschalten">${isDone ? "✓" : ""}</button>
           <div class="body">
@@ -1127,7 +1269,7 @@
             ${noteHtml}
             ${subToggleHtml}
             ${subListHtml}
-            <div class="meta">Erstellt am ${formatDate(entry.createdAt)}</div>
+            ${compact ? "" : `<div class="meta">Erstellt am ${formatDate(entry.createdAt)}</div>`}
           </div>
           <div class="actions">
             <button class="icon-btn edit" title="Bearbeiten">✏️</button>
@@ -1254,7 +1396,8 @@
         if (!entry || !Array.isArray(entry.subtasks) || !entry.subtasks[index]) return;
         entry.subtasks[index].done = !entry.subtasks[index].done;
         saveEntries();
-        renderAllList(); // Aufklapp-Zustand bleibt über expandedEntries erhalten
+        renderAllList();   // Aufklapp-Zustand bleibt über expandedEntries erhalten
+        renderDayList();   // Dashboard-Tagesliste nutzt dieselben Zeilen
       }
 
       function resetForm() {
@@ -1309,6 +1452,12 @@
           );
           renderAllList();
         });
+      });
+
+      // Dashboard: "+N weitere" / "Weniger anzeigen" umschalten.
+      document.getElementById("day-more").addEventListener("click", () => {
+        dayListExpanded = !dayListExpanded;
+        renderDayList();
       });
 
       document.getElementById("f-save").addEventListener("click", saveForm);
@@ -2169,25 +2318,6 @@
         card.querySelector(".hb-toggle").addEventListener("click", () => toggleHabitToday(habit.id));
         card.querySelector(".hb-del").addEventListener("click", () => deleteHabit(habit.id));
         return card;
-      }
-
-      // Kompakte Zeile für die Tagesübersicht im Dashboard.
-      function buildHabitDashboardRow(habit) {
-        const skill = habit.skillId ? skills.find((s) => s.id === habit.skillId) : null;
-        const el = document.createElement("div");
-        el.className = "entry"; // nutzt das Eintrags-Styling (ohne Kategorie-Streifen)
-        el.innerHTML = `
-          <button class="check" title="Heute abhaken"></button>
-          <div class="body">
-            <div class="row1">
-              <span class="name">🔁 ${escapeHtml(habit.name)}</span>
-              <span class="badge">${frequencyLabel(habit)}</span>
-              ${skill ? `<span class="badge area">🎯 ${escapeHtml(skill.name)}</span>` : ""}
-            </div>
-          </div>
-        `;
-        el.querySelector(".check").addEventListener("click", () => toggleHabitToday(habit.id));
-        return el;
       }
 
       /* ---- Aktionen ------------------------------------------------------ */

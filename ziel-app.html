@@ -355,6 +355,10 @@
         border-radius: 8px; padding: 4px 9px; cursor: pointer;
       }
       .notice button:hover { color: var(--text); border-color: var(--accent-2); }
+      /* Warn-Variante (rot) für sicherheitsrelevante Hinweise */
+      .notice.warn { background: rgba(248, 113, 113, 0.12); border-color: var(--danger); }
+      /* Info-Variante (cyan) z. B. für die Quelle der Erkennung */
+      .notice.info2 { background: rgba(34, 211, 238, 0.10); border-color: var(--accent); }
 
       /* ====================================================================
          7) SCHNELLEINGABE (Vorschau-Karten)
@@ -453,6 +457,7 @@
           <button class="tab" data-view="habits">🔁 Habits</button>
           <button class="tab" data-view="form">➕ Neuer Eintrag</button>
           <button class="tab" data-view="quick">⚡ Schnelleingabe</button>
+          <button class="tab" data-view="settings">⚙️ Einstellungen</button>
         </nav>
       </header>
 
@@ -700,11 +705,12 @@
         <div class="panel">
           <h2>⚡ Schnelleingabe</h2>
           <p class="hint">
-            Mehrere Aufgaben auf einmal einfügen (z. B. aus einer Mail kopiert).
-            Eine Zeile = eine Aufgabe. Eingerückte Zeilen oder Zeilen mit
-            <code>-</code>, <code>*</code>, <code>&gt;</code> werden zu Unterpunkten.
-            Marker: <code>@arbeit</code>/<code>@alltag</code>/<code>@privat</code>/<code>@ziel</code>
-            setzt die Kategorie, <code>!05.11.2026</code> oder <code>!2026-11-05</code> die Deadline.
+            Schreib einfach drauflos (z. B. aus einer Mail kopiert). Mit hinterlegtem
+            API-Key erkennt Claude Aufgaben, Unterpunkte, Kategorien, Deadlines und
+            Habits automatisch aus dem Fließtext. Ohne Key greift der regelbasierte
+            Parser (Zeile = Aufgabe; <code>-</code>/<code>*</code>/Einrückung = Unterpunkt;
+            <code>@arbeit</code>/<code>@alltag</code>/<code>@privat</code>/<code>@ziel</code>;
+            <code>!2026-11-05</code>). Den Key hinterlegst du unter „⚙️ Einstellungen".
           </p>
 
           <div class="field">
@@ -721,11 +727,44 @@
         <!-- Vorschau-Bereich (versteckt bis "Vorschau" geklickt wurde) -->
         <div class="panel hidden" id="q-preview-panel">
           <h2>Vorschau</h2>
-          <p class="hint">Haken entfernen = nicht übernehmen. Titel sind direkt editierbar.</p>
+          <p class="hint">Haken entfernen = nicht übernehmen. Titel/Namen sind direkt editierbar.</p>
+          <!-- Zeigt, ob per Claude API oder per Fallback-Parser erkannt wurde -->
+          <div id="q-source"></div>
           <div id="q-preview-list"></div>
           <div class="form-actions">
             <button class="btn primary" id="q-apply-btn">✅ Übernehmen</button>
             <button class="btn ghost" id="q-back-btn">Zurück</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT: EINSTELLUNGEN (API-Key)
+           ================================================================ -->
+      <section id="view-settings" class="hidden">
+        <div class="panel">
+          <h2>⚙️ Einstellungen</h2>
+
+          <!-- Deutliche Warnung: nur lokale Nutzung -->
+          <div class="notice warn">
+            <span>⚠️ <strong>Nur für die lokale Nutzung gedacht.</strong> Diese Datei ruft die
+            Claude API direkt aus dem Browser auf. Dein API-Key wird ausschließlich in deinem
+            Browser (localStorage) gespeichert und steht <strong>nicht</strong> im Code. Gib diese
+            Datei und deinen Key nicht weiter und stelle sie nicht öffentlich ins Netz — im Browser
+            ist der Key für Skripte der Seite sichtbar. Für einen echten Mehrbenutzer-Einsatz gehört
+            der Aufruf später hinter ein eigenes Backend.</span>
+          </div>
+
+          <div class="field">
+            <label for="set-apikey">Anthropic API-Key</label>
+            <input type="password" id="set-apikey" placeholder="sk-ant-..." autocomplete="off" />
+          </div>
+
+          <div class="hint" id="set-status">Kein API-Key gespeichert.</div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="set-save">💾 Speichern</button>
+            <button class="btn ghost" id="set-clear">Key löschen</button>
           </div>
         </div>
       </section>
@@ -782,9 +821,10 @@
          -------------------------------------------------------------------- */
 
       // Schlüssel, unter denen wir im Browser speichern.
-      const STORAGE_KEY = "questlog.entries.v1";
-      const SKILLS_KEY  = "questlog.skills.v1";
-      const HABITS_KEY  = "questlog.habits.v1";
+      const STORAGE_KEY   = "questlog.entries.v1";
+      const SKILLS_KEY    = "questlog.skills.v1";
+      const HABITS_KEY    = "questlog.habits.v1";
+      const SETTINGS_KEY  = "questlog.settings.v1";
 
       // Standard-Bereich für Skills, die beim Laden noch keinen "area" haben.
       const DEFAULT_AREA = "work";
@@ -816,6 +856,7 @@
       let entries = loadEntries();
       let skills = loadSkills();
       let habits = loadHabits();
+      let settings = loadSettings(); // enthält u. a. den API-Key
 
       // Merkt sich den aktuell gewählten Kategorie-Filter in Ansicht 2.
       let activeFilter = "all";
@@ -825,7 +866,9 @@
       const expandedEntries = new Set();
 
       // Zwischenspeicher für die Schnelleingabe-Vorschau.
-      let quickParsed = [];
+      let quickTasks = [];              // erkannte Aufgaben
+      let quickHabits = [];             // erkannte Habits
+      let quickSource = "rule";         // "ai" (Claude API) oder "rule" (Fallback)
 
       /* ---- Laden + Migrieren --------------------------------------------- */
 
@@ -1233,6 +1276,7 @@
         document.getElementById("view-form").classList.toggle("hidden", view !== "form");
         document.getElementById("view-quick").classList.toggle("hidden", view !== "quick");
         document.getElementById("view-habits").classList.toggle("hidden", view !== "habits");
+        document.getElementById("view-settings").classList.toggle("hidden", view !== "settings");
 
         document.querySelectorAll(".tab").forEach((tab) => {
           tab.classList.toggle("active", tab.dataset.view === view);
@@ -1241,6 +1285,11 @@
         if (view !== "form") resetForm();
         if (view !== "skills") hideSkillForm();
         if (view !== "habits") hideHabitForm();
+        // Beim Öffnen der Einstellungen den aktuellen Key ins Feld spiegeln.
+        if (view === "settings") {
+          document.getElementById("set-apikey").value = getApiKey();
+          renderSettingsStatus();
+        }
       }
 
       /* --------------------------------------------------------------------
@@ -1584,77 +1633,243 @@
         return tasks;
       }
 
-      // Baut die Vorschau-Karten aus quickParsed.
+      /* ---- Claude-API-Aufruf (die EINE Funktion, später serverseitig ersetzbar) ----
+         Diese Funktion kapselt den kompletten Netzwerk-Aufruf. Wer die Analyse
+         später auf einen Server verschieben will, ersetzt NUR den Inhalt dieser
+         Funktion (z. B. fetch gegen das eigene Backend). Der Rest der App – Vorschau,
+         Speichern, Fallback – bleibt unverändert.
+         Rückgabe: { tasks: [...], habits: [...] }  oder wirft einen Fehler. */
+      async function aiExtractStructured(freeText, todayStr) {
+        const apiKey = getApiKey();
+        if (!apiKey) throw new Error("Kein API-Key hinterlegt.");
+
+        const MODEL = "claude-opus-5-5"; // aktuelles Claude-Modell
+
+        // System-Prompt: beschreibt exakt das gewünschte JSON und die Kategorien.
+        const system =
+          "Du wandelst deutschen Fließtext in strukturierte To-dos und Habits um. " +
+          "Antworte AUSSCHLIESSLICH mit einem JSON-Objekt – kein Fließtext, keine Code-Fences. " +
+          'Schema: {"tasks":[{"title":string,"category":"arbeit"|"alltag"|"privat"|"ziel",' +
+          '"deadline":"YYYY-MM-DD"|null,"subtasks":[{"title":string}]}],' +
+          '"habits":[{"name":string,"frequency":"daily"|"weekly","timesPerWeek":number|null}]}. ' +
+          "Einmalige Vorhaben sind tasks. Wiederkehrende Aktivitäten (z. B. 'dreimal pro Woche laufen') " +
+          "sind habits mit frequency 'weekly' und timesPerWeek=3 bzw. frequency 'daily' und timesPerWeek null. " +
+          "Löse relative Datumsangaben wie 'Freitag' oder 'in drei Tagen' anhand des mitgegebenen heutigen Datums auf. " +
+          "Kategorie bestmöglich einschätzen: beruflich=arbeit, Haushalt/Alltag=alltag, Persönliches=privat, " +
+          "langfristige Ziele=ziel. Teilschritte eines Vorhabens kommen in subtasks.";
+
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            // Erlaubt den Direktaufruf aus dem Browser (nur für lokale Nutzung!).
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: 2000,
+            system: system,
+            messages: [
+              { role: "user", content: `Heutiges Datum: ${todayStr}\n\nText:\n${freeText}` },
+            ],
+          }),
+        });
+
+        if (!res.ok) {
+          const detail = await res.text().catch(() => "");
+          throw new Error("API-Fehler " + res.status + (detail ? ": " + detail : ""));
+        }
+
+        const data = await res.json();
+        // Die Antwort ist ein Array aus Blöcken; wir brauchen den Text-Block
+        // (bei aktiviertem Thinking können weitere Blöcke davor stehen).
+        const textBlock = (data.content || []).find((b) => b.type === "text");
+        const rawText = textBlock ? textBlock.text : "";
+        return normalizeAiResult(extractJsonObject(rawText));
+      }
+
+      // Holt ein JSON-Objekt robust aus dem Antworttext (mit/ohne Code-Fences).
+      function extractJsonObject(text) {
+        if (!text) throw new Error("Leere Antwort vom Modell.");
+        try { return JSON.parse(text); } catch (e) {}
+        const t = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try { return JSON.parse(t); } catch (e) {}
+        const first = t.indexOf("{");
+        const last = t.lastIndexOf("}");
+        if (first >= 0 && last > first) return JSON.parse(t.slice(first, last + 1));
+        throw new Error("Antwort war kein gültiges JSON.");
+      }
+
+      // Bringt das KI-Ergebnis auf unsere interne Struktur (mit Defaults + Validierung).
+      function normalizeAiResult(obj) {
+        const cats = ["arbeit", "alltag", "privat", "ziel"];
+        const rawTasks = Array.isArray(obj.tasks) ? obj.tasks : [];
+        const rawHabits = Array.isArray(obj.habits) ? obj.habits : [];
+        return {
+          tasks: rawTasks
+            .map((t) => ({
+              title: String(t.title || "").trim(),
+              category: cats.includes(t.category) ? t.category : "alltag",
+              deadline: /^\d{4}-\d{2}-\d{2}$/.test(t.deadline || "") ? t.deadline : null,
+              subtasks: Array.isArray(t.subtasks)
+                ? t.subtasks
+                    .map((s) => ({ title: String((s && s.title) || s || "").trim(), done: false }))
+                    .filter((s) => s.title)
+                : [],
+              include: true,
+            }))
+            .filter((t) => t.title),
+          habits: rawHabits
+            .map((h) => ({
+              name: String(h.name || "").trim(),
+              frequency: h.frequency === "weekly" ? "weekly" : "daily",
+              timesPerWeek: h.frequency === "weekly" ? (parseInt(h.timesPerWeek, 10) || 1) : null,
+              include: true,
+            }))
+            .filter((h) => h.name),
+        };
+      }
+
+      /* ---- Vorschau zeichnen (Aufgaben + Habits + Quelle-Banner) ---------- */
       function renderQuickPreview() {
         const box = document.getElementById("q-preview-list");
+        const flag = document.getElementById("q-source");
         box.innerHTML = "";
 
-        if (quickParsed.length === 0) {
-          box.innerHTML = `<div class="empty">Nichts erkannt. Schreibe mindestens eine Zeile.</div>`;
+        // Sichtbar machen, woher das Ergebnis kommt.
+        flag.innerHTML =
+          quickSource === "ai"
+            ? '<div class="notice info2"><span>🤖 Erkannt per Claude API (freier Fließtext).</span></div>'
+            : '<div class="notice warn"><span>⚙️ Regelbasierter Parser aktiv (kein API-Key oder API-Fehler). ' +
+              "Es gelten die Marker @arbeit/@alltag/@privat/@ziel und !YYYY-MM-DD.</span></div>";
+
+        if (quickTasks.length === 0 && quickHabits.length === 0) {
+          box.innerHTML = '<div class="empty">Nichts erkannt.</div>';
           return;
         }
 
-        quickParsed.forEach((task, i) => {
-          const catInfo = CATEGORY_INFO[task.category] || { label: task.category, icon: "•" };
+        if (quickTasks.length) {
+          const h = document.createElement("div");
+          h.className = "block-sub";
+          h.textContent = "Aufgaben";
+          box.appendChild(h);
+          quickTasks.forEach((task) => box.appendChild(buildQuickTaskRow(task)));
+        }
 
-          const deadlineBadge = task.deadline
-            ? `<span class="badge">📅 ${formatDate(task.deadline)}</span>`
-            : "";
-
-          const subHtml = task.subtasks.length
-            ? `<ul class="q-sub-list">${task.subtasks
-                .map((s) => `<li>${escapeHtml(s.title)}</li>`)
-                .join("")}</ul>`
-            : "";
-
-          const row = document.createElement("div");
-          row.className = "q-task" + (task.include ? "" : " excluded");
-          row.innerHTML = `
-            <input type="checkbox" class="q-include" ${task.include ? "checked" : ""} />
-            <div class="q-task-body">
-              <input type="text" class="q-title-input" value="${escapeHtml(task.title)}" />
-              <div class="q-meta">
-                <span class="badge cat-${task.category}">${catInfo.icon} ${catInfo.label}</span>
-                ${deadlineBadge}
-              </div>
-              ${subHtml}
-            </div>
-          `;
-
-          // Checkbox: ein-/ausschließen.
-          const cb = row.querySelector(".q-include");
-          cb.addEventListener("change", () => {
-            task.include = cb.checked;
-            row.classList.toggle("excluded", !cb.checked);
-          });
-
-          // Titel korrigierbar.
-          const titleInput = row.querySelector(".q-title-input");
-          titleInput.addEventListener("input", () => {
-            task.title = titleInput.value;
-          });
-
-          box.appendChild(row);
-        });
+        if (quickHabits.length) {
+          const h = document.createElement("div");
+          h.className = "block-sub";
+          h.textContent = "Habits";
+          box.appendChild(h);
+          quickHabits.forEach((hab) => box.appendChild(buildQuickHabitRow(hab)));
+        }
       }
 
-      // "Vorschau"-Knopf: Text parsen und Vorschau zeigen.
-      function previewQuick() {
-        const text = document.getElementById("q-input").value;
-        quickParsed = parseQuickInput(text);
+      // Eine Aufgaben-Vorschauzeile (Checkbox zum Abwählen, Titel editierbar).
+      function buildQuickTaskRow(task) {
+        const catInfo = CATEGORY_INFO[task.category] || { label: task.category, icon: "•" };
+        const deadlineBadge = task.deadline
+          ? `<span class="badge">📅 ${formatDate(task.deadline)}</span>`
+          : "";
+        const subHtml = task.subtasks.length
+          ? `<ul class="q-sub-list">${task.subtasks
+              .map((s) => `<li>${escapeHtml(s.title)}</li>`)
+              .join("")}</ul>`
+          : "";
+
+        const row = document.createElement("div");
+        row.className = "q-task" + (task.include ? "" : " excluded");
+        row.innerHTML = `
+          <input type="checkbox" class="q-include" ${task.include ? "checked" : ""} />
+          <div class="q-task-body">
+            <input type="text" class="q-title-input" value="${escapeHtml(task.title)}" />
+            <div class="q-meta">
+              <span class="badge cat-${task.category}">${catInfo.icon} ${catInfo.label}</span>
+              ${deadlineBadge}
+            </div>
+            ${subHtml}
+          </div>
+        `;
+        const cb = row.querySelector(".q-include");
+        cb.addEventListener("change", () => {
+          task.include = cb.checked;
+          row.classList.toggle("excluded", !cb.checked);
+        });
+        const ti = row.querySelector(".q-title-input");
+        ti.addEventListener("input", () => { task.title = ti.value; });
+        return row;
+      }
+
+      // Eine Habit-Vorschauzeile (Checkbox zum Abwählen, Name editierbar).
+      function buildQuickHabitRow(hab) {
+        const freq = hab.frequency === "weekly" ? (hab.timesPerWeek || 1) + "× pro Woche" : "Täglich";
+        const row = document.createElement("div");
+        row.className = "q-task" + (hab.include ? "" : " excluded");
+        row.innerHTML = `
+          <input type="checkbox" class="q-include" ${hab.include ? "checked" : ""} />
+          <div class="q-task-body">
+            <input type="text" class="q-title-input" value="${escapeHtml(hab.name)}" />
+            <div class="q-meta"><span class="badge">🔁 ${freq}</span></div>
+          </div>
+        `;
+        const cb = row.querySelector(".q-include");
+        cb.addEventListener("change", () => {
+          hab.include = cb.checked;
+          row.classList.toggle("excluded", !cb.checked);
+        });
+        const ti = row.querySelector(".q-title-input");
+        ti.addEventListener("input", () => { hab.name = ti.value; });
+        return row;
+      }
+
+      // "Vorschau"-Knopf: bevorzugt Claude API, sonst Fallback-Parser.
+      async function previewQuick() {
+        const text = document.getElementById("q-input").value.trim();
+        if (!text) { alert("Bitte zuerst Text eingeben."); return; }
+
+        if (getApiKey()) {
+          // KI-Pfad (mit Ladezustand am Knopf).
+          const btn = document.getElementById("q-preview-btn");
+          btn.disabled = true;
+          btn.textContent = "⏳ Analysiere ...";
+          try {
+            const result = await aiExtractStructured(text, todayISO());
+            quickTasks = result.tasks;
+            quickHabits = result.habits;
+            quickSource = "ai";
+          } catch (err) {
+            // Fehler -> sichtbar auf den regelbasierten Parser zurückfallen.
+            console.warn("KI-Analyse fehlgeschlagen, nutze Fallback:", err);
+            quickTasks = parseQuickInput(text);
+            quickHabits = [];
+            quickSource = "rule";
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "👁️ Vorschau";
+          }
+        } else {
+          // Kein Key -> direkt regelbasiert.
+          quickTasks = parseQuickInput(text);
+          quickHabits = [];
+          quickSource = "rule";
+        }
+
         renderQuickPreview();
         document.getElementById("q-preview-panel").classList.remove("hidden");
       }
 
-      // "Übernehmen": ausgewählte Aufgaben als echte Einträge speichern.
+      // "Übernehmen": ausgewählte Aufgaben + Habits speichern.
       function applyQuick() {
-        const selected = quickParsed.filter((t) => t.include && t.title.trim() !== "");
-        if (selected.length === 0) {
-          alert("Keine Aufgaben ausgewählt.");
+        const tasks = quickTasks.filter((t) => t.include && t.title.trim() !== "");
+        const habs = quickHabits.filter((h) => h.include && h.name.trim() !== "");
+        if (tasks.length === 0 && habs.length === 0) {
+          alert("Nichts ausgewählt.");
           return;
         }
 
-        selected.forEach((t) => {
+        tasks.forEach((t) => {
           entries.push({
             id: makeId(),
             title: t.title.trim(),
@@ -1667,35 +1882,95 @@
           });
         });
 
+        habs.forEach((h) => {
+          habits.push({
+            id: makeId(),
+            name: h.name.trim(),
+            frequency: h.frequency,
+            timesPerWeek: h.frequency === "weekly" ? (h.timesPerWeek || 1) : null,
+            skillId: null, // Verknüpfung kann der Nutzer später in der Habits-Ansicht setzen
+            completions: [],
+          });
+        });
+
         saveEntries();
+        saveHabits();
         clearQuick();
         render();
         switchView("all");
       }
 
-      // Setzt die Schnelleingabe zurück (Text + Vorschau).
+      // Setzt die Schnelleingabe zurück (Text + Vorschau + Quelle).
       function clearQuick() {
         document.getElementById("q-input").value = "";
-        quickParsed = [];
+        quickTasks = [];
+        quickHabits = [];
+        quickSource = "rule";
         document.getElementById("q-preview-list").innerHTML = "";
+        document.getElementById("q-source").innerHTML = "";
         document.getElementById("q-preview-panel").classList.add("hidden");
       }
 
-      // Beispiel-Platzhaltertext, der die Syntax zeigt.
+      // Beispiel-Platzhaltertext: zeigt, dass freier Fließtext reicht.
       document.getElementById("q-input").placeholder =
-        "Kunde Müller: Unterlagen senden @arbeit !05.11.2026\n" +
-        "  Angebot prüfen\n" +
-        "  Rückruf vereinbaren\n" +
-        "Einkaufen @alltag\n" +
-        "- Milch\n" +
-        "- Brot\n" +
-        "100 Liegestütze schaffen @ziel";
+        "Ich muss Kunde Meier die Unterlagen schicken, bis Freitag, und danach in drei " +
+        "Tagen nachhaken ob angekommen. Außerdem will ich diese Woche dreimal laufen.";
 
       document.getElementById("q-preview-btn").addEventListener("click", previewQuick);
       document.getElementById("q-clear-btn").addEventListener("click", clearQuick);
       document.getElementById("q-apply-btn").addEventListener("click", applyQuick);
       document.getElementById("q-back-btn").addEventListener("click", () => {
         document.getElementById("q-preview-panel").classList.add("hidden");
+      });
+
+      /* ====================================================================
+         EINSTELLUNGEN (API-Key in localStorage)
+         ==================================================================== */
+
+      // Lädt die Einstellungen (robust gegen fehlende/kaputte Daten).
+      function loadSettings() {
+        try {
+          const raw = localStorage.getItem(SETTINGS_KEY);
+          if (!raw) return { apiKey: "" };
+          const d = JSON.parse(raw);
+          return d && typeof d === "object" ? { apiKey: d.apiKey || "" } : { apiKey: "" };
+        } catch (err) {
+          console.warn("Konnte Einstellungen nicht laden:", err);
+          return { apiKey: "" };
+        }
+      }
+      function saveSettings() {
+        try {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        } catch (err) {
+          console.warn("Konnte Einstellungen nicht speichern:", err);
+        }
+      }
+      // Einzige Stelle, an der der Key gelesen wird.
+      function getApiKey() {
+        return (settings.apiKey || "").trim();
+      }
+
+      // Zeigt (maskiert) an, ob ein Key gespeichert ist.
+      function renderSettingsStatus() {
+        const el = document.getElementById("set-status");
+        const key = getApiKey();
+        el.textContent = key
+          ? "Aktuell gespeichert: " + key.slice(0, 10) + "… (" + key.length + " Zeichen)"
+          : "Kein API-Key gespeichert.";
+      }
+
+      document.getElementById("set-save").addEventListener("click", () => {
+        settings.apiKey = document.getElementById("set-apikey").value.trim();
+        saveSettings();
+        renderSettingsStatus();
+        alert("API-Key gespeichert (nur in diesem Browser).");
+      });
+      document.getElementById("set-clear").addEventListener("click", () => {
+        settings.apiKey = "";
+        document.getElementById("set-apikey").value = "";
+        saveSettings();
+        renderSettingsStatus();
       });
 
       /* ====================================================================

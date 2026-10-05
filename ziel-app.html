@@ -564,7 +564,6 @@
           <div class="filters">
             <button class="filter active" data-filter="all">Alle</button>
             <button class="filter" data-filter="arbeit">💼 Arbeit</button>
-            <button class="filter" data-filter="alltag">🏠 Alltag</button>
             <button class="filter" data-filter="privat">👤 Privat</button>
             <button class="filter" data-filter="ziel">🏆 Langfristiges Ziel</button>
           </div>
@@ -710,7 +709,6 @@
             <label for="f-category">Kategorie</label>
             <select id="f-category">
               <option value="arbeit">💼 Arbeit</option>
-              <option value="alltag">🏠 Alltag</option>
               <option value="privat">👤 Privat</option>
               <option value="ziel">🏆 Langfristiges Ziel</option>
             </select>
@@ -744,7 +742,7 @@
             API-Key erkennt Claude Aufgaben, Unterpunkte, Kategorien, Deadlines und
             Habits automatisch aus dem Fließtext. Ohne Key greift der regelbasierte
             Parser (Zeile = Aufgabe; <code>-</code>/<code>*</code>/Einrückung = Unterpunkt;
-            <code>@arbeit</code>/<code>@alltag</code>/<code>@privat</code>/<code>@ziel</code>;
+            <code>@arbeit</code>/<code>@privat</code>/<code>@ziel</code>;
             <code>!2026-11-05</code>). Den Key hinterlegst du unter „⚙️ Einstellungen".
           </p>
 
@@ -822,7 +820,7 @@
          Eintrag (Aufgabe / To-do):
            {
              id, title,
-             category:  "arbeit" | "alltag" | "privat" | "ziel",
+             category:  "arbeit" | "privat" | "ziel",
              deadline:  "2026-11-05" | null,
              status:    "offen" | "erledigt",
              createdAt: "2026-10-05T10:00:00.000Z",
@@ -872,7 +870,6 @@
       // die Kategorien sind bewusst deutsche Schlüssel laut Plan).
       const CATEGORY_INFO = {
         arbeit: { label: "Arbeit", icon: "💼" },
-        alltag: { label: "Alltag", icon: "🏠" },
         privat: { label: "Privat", icon: "👤" },
         ziel:   { label: "Langfristiges Ziel", icon: "🏆" },
       };
@@ -933,7 +930,8 @@
       function migrateEntry(e) {
         const copy = Object.assign({}, e);
         delete copy.skillData;                       // totes Feld entfernen
-        if (copy.category === "skill") copy.category = "ziel"; // skill -> ziel
+        if (copy.category === "skill") copy.category = "ziel";   // skill -> ziel
+        if (copy.category === "alltag") copy.category = "privat"; // Alltag -> Privat (zusammengelegt)
         if (!Array.isArray(copy.subtasks)) copy.subtasks = []; // neues Feld
         return copy;
       }
@@ -1058,7 +1056,7 @@
       }
 
       // Reihenfolge der Kategorien innerhalb eines Prioritäts-Blocks (Arbeit zuerst).
-      const DAY_CAT_ORDER = { arbeit: 0, privat: 1, ziel: 2, alltag: 3 };
+      const DAY_CAT_ORDER = { arbeit: 0, privat: 1, ziel: 2 };
 
       // Zähler-Kacheln (nur Arbeit/Privat/Ziele). Zahl = heute offene Aufgaben
       // der Kategorie (überfällig oder heute fällig). Klick filtert die Tagesliste.
@@ -1403,7 +1401,7 @@
       function resetForm() {
         document.getElementById("f-id").value = "";
         document.getElementById("f-title").value = "";
-        document.getElementById("f-category").value = "alltag";
+        document.getElementById("f-category").value = "privat";
         document.getElementById("f-deadline").value = "";
         document.getElementById("f-note").value = "";
         document.getElementById("form-title").textContent = "Neuer Eintrag";
@@ -1707,7 +1705,7 @@
            - Zeile ohne Einrückung         = neue Aufgabe
            - Zeile eingerückt ODER mit -,*,> = Unterpunkt der Aufgabe darüber
            - Leere Zeilen werden ignoriert
-           - @arbeit / @alltag / @privat / @ziel setzt die Kategorie
+           - @arbeit / @privat / @ziel setzt die Kategorie (@alltag = Alias für @privat)
            - !05.11.2026 oder !2026-11-05 setzt die Deadline
            - Diese Marker werden aus dem Titel entfernt
          ==================================================================== */
@@ -1733,6 +1731,7 @@
         const catMatch = title.match(/@(arbeit|alltag|privat|ziel)\b/i);
         if (catMatch) {
           category = catMatch[1].toLowerCase();
+          if (category === "alltag") category = "privat"; // Alias: Alltag -> Privat
           title = title.replace(catMatch[0], "");
         }
 
@@ -1772,7 +1771,7 @@
             // Neue Aufgabe.
             current = {
               title: parsed.title,
-              category: parsed.category || "alltag", // Default, wenn kein Marker
+              category: parsed.category || "privat", // Default, wenn kein Marker
               deadline: parsed.deadline || null,
               subtasks: [],
               include: true, // in der Vorschau standardmäßig ausgewählt
@@ -1799,7 +1798,7 @@
         const system =
           "Du wandelst deutschen Fließtext in strukturierte To-dos und Habits um. " +
           "Antworte AUSSCHLIESSLICH mit einem JSON-Objekt – kein Fließtext, keine Code-Fences. " +
-          'Schema: {"tasks":[{"title":string,"category":"arbeit"|"alltag"|"privat"|"ziel",' +
+          'Schema: {"tasks":[{"title":string,"category":"arbeit"|"privat"|"ziel",' +
           '"deadline":"YYYY-MM-DD"|null,"note":string,"subtasks":[{"title":string}]}],' +
           '"habits":[{"name":string,"frequency":"daily"|"weekly","timesPerWeek":number|null}]}. ' +
           "TITEL-REGELN: Übernimm Titel NICHT wörtlich. Formuliere sie zu kurzen, prägnanten Stichpunkten um – " +
@@ -1812,7 +1811,7 @@
           "Einmalige Vorhaben sind tasks. Wiederkehrende Aktivitäten (z. B. 'dreimal pro Woche laufen') " +
           "sind habits mit frequency 'weekly' und timesPerWeek=3 bzw. frequency 'daily' und timesPerWeek null. " +
           "Löse relative Datumsangaben wie 'Freitag' oder 'in drei Tagen' anhand des mitgegebenen heutigen Datums auf. " +
-          "Kategorie bestmöglich einschätzen: beruflich=arbeit, Haushalt/Alltag=alltag, Persönliches=privat, " +
+          "Kategorie bestmöglich einschätzen: beruflich=arbeit, Alltag/Haushalt/Persönliches=privat, " +
           "langfristige Ziele=ziel. Teilschritte eines Vorhabens kommen in subtasks.";
 
         const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1861,14 +1860,14 @@
 
       // Bringt das KI-Ergebnis auf unsere interne Struktur (mit Defaults + Validierung).
       function normalizeAiResult(obj) {
-        const cats = ["arbeit", "alltag", "privat", "ziel"];
+        const cats = ["arbeit", "privat", "ziel"];
         const rawTasks = Array.isArray(obj.tasks) ? obj.tasks : [];
         const rawHabits = Array.isArray(obj.habits) ? obj.habits : [];
         return {
           tasks: rawTasks
             .map((t) => ({
               title: String(t.title || "").trim(),
-              category: cats.includes(t.category) ? t.category : "alltag",
+              category: cats.includes(t.category) ? t.category : "privat",
               deadline: /^\d{4}-\d{2}-\d{2}$/.test(t.deadline || "") ? t.deadline : null,
               note: String(t.note || "").trim(),
               subtasks: Array.isArray(t.subtasks)
@@ -1901,7 +1900,7 @@
           quickSource === "ai"
             ? '<div class="notice info2"><span>🤖 Erkannt per Claude API (freier Fließtext).</span></div>'
             : '<div class="notice warn"><span>⚙️ Regelbasierter Parser aktiv (kein API-Key oder API-Fehler). ' +
-              "Es gelten die Marker @arbeit/@alltag/@privat/@ziel und !YYYY-MM-DD.</span></div>";
+              "Es gelten die Marker @arbeit/@privat/@ziel und !YYYY-MM-DD.</span></div>";
 
         if (quickTasks.length === 0 && quickHabits.length === 0) {
           box.innerHTML = '<div class="empty">Nichts erkannt.</div>';

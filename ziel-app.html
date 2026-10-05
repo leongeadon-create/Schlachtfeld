@@ -1,0 +1,2462 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quest Log — Ziele & To-dos</title>
+    <meta name="description" content="Simple To-do/Ziel-App im dunklen Gaming-Look." />
+
+    <!--
+      ========================================================================
+      QUEST LOG — eine einzelne HTML-Datei (HTML + CSS + Vanilla JavaScript)
+      ========================================================================
+      Aufbau dieser Datei (von oben nach unten):
+        1. <style>  ... das gesamte CSS (Aussehen / dunkles Gaming-Theme)
+        2. <body>   ... die Struktur (Header, Ansichten, Formulare)
+        3. <script> ... die Logik (Daten, Speichern, Anzeigen, Ereignisse)
+
+      Für Einsteiger:
+        - "const"/"let" sind Variablen (const = unveränderbar, let = veränderbar).
+        - Eine "function" ist ein wiederverwendbarer Block Code.
+        - "document.querySelector(...)" holt ein HTML-Element per CSS-Auswahl.
+        - localStorage ist ein kleiner Speicher im Browser, der Neuladen übersteht.
+      ========================================================================
+    -->
+
+    <style>
+      /* ====================================================================
+         1) DESIGN-TOKENS ("Variablen" fürs Aussehen)
+         --------------------------------------------------------------------
+         In :root definieren wir Farben einmal zentral. Überall im CSS
+         schreiben wir dann z.B. var(--accent). Willst du die Akzentfarbe
+         ändern, änderst du nur diese eine Zeile.
+         ==================================================================== */
+      :root {
+        --bg:            #0d1117;  /* Seitenhintergrund (sehr dunkel) */
+        --surface:       #161b22;  /* Karten / Panels */
+        --surface-2:     #1c2230;  /* etwas hellere Fläche (Inputs) */
+        --border:        #2a3040;  /* dezente Ränder */
+        --text:          #e6edf3;  /* Haupttext (fast weiß) */
+        --text-dim:      #8b95a5;  /* abgeschwächter Text */
+        --accent:        #22d3ee;  /* Akzent 1: Cyan */
+        --accent-2:      #a855f7;  /* Akzent 2: Violett */
+        --danger:        #f87171;  /* Rot für Löschen / Warnungen */
+        --success:       #4ade80;  /* Grün für "erledigt" */
+        --radius:        12px;     /* Standard-Eckenrundung */
+        --shadow:        0 8px 24px rgba(0, 0, 0, 0.4);
+
+        /* Kategorie-Farben (an EINER Stelle änderbar, überall konsistent) */
+        --cat-arbeit:    #3b82f6;  /* Blau */
+        --cat-alltag:    #a855f7;  /* Violett (ohne eigene Dashboard-Kachel) */
+        --cat-privat:    #34d399;  /* Grün */
+        --cat-ziel:      #fbbf24;  /* Amber */
+      }
+
+      /* Grund-Reset: einheitliches Box-Modell, Abstände zurücksetzen */
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.5;
+        /* leichter Farbverlauf im Hintergrund für "Gaming"-Stimmung */
+        background-image:
+          radial-gradient(900px 500px at 15% -10%, rgba(34, 211, 238, 0.08), transparent),
+          radial-gradient(900px 500px at 85% -10%, rgba(168, 85, 247, 0.10), transparent);
+        min-height: 100vh;
+      }
+
+      /* Zentrierter Inhaltsbereich, damit es auf großen Bildschirmen nicht
+         auseinanderfällt. 16px Innenabstand = Rand auch auf Handys. */
+      .wrap { max-width: 860px; margin: 0 auto; padding: 16px; }
+
+      /* ---- Kopfzeile mit Titel und Navigation --------------------------- */
+      header { padding: 20px 0 12px; }
+
+      .brand {
+        display: flex; align-items: center; gap: 10px;
+        font-size: 1.6rem; font-weight: 800; letter-spacing: 0.5px;
+      }
+      .brand .logo { font-size: 1.8rem; }
+      /* Farbverlauf-Text für den Titel (Cyan -> Violett) */
+      .brand .title {
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        -webkit-background-clip: text; background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .brand .sub { color: var(--text-dim); font-size: 0.85rem; font-weight: 500; }
+
+      /* ---- Tab-Navigation ----------------------------------------------- */
+      nav.tabs { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+      .tab {
+        background: var(--surface); color: var(--text-dim);
+        border: 1px solid var(--border); border-radius: 999px;
+        padding: 8px 16px; font-size: 0.9rem; font-weight: 600;
+        cursor: pointer; transition: all 0.15s ease;
+      }
+      .tab:hover { color: var(--text); border-color: var(--accent); }
+      /* aktiver Tab wird hervorgehoben */
+      .tab.active {
+        color: #041014; border-color: transparent;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      }
+
+      /* ====================================================================
+         2) KARTEN / ALLGEMEINE BAUSTEINE
+         ==================================================================== */
+      .panel {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 18px; margin-top: 16px;
+        box-shadow: var(--shadow);
+      }
+      .panel h2 { font-size: 1.05rem; margin-bottom: 4px; }
+      .panel .hint { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; }
+
+      /* Kleiner Trick: Ansichten, die nicht aktiv sind, blenden wir aus.
+         Über .hidden schalten wir per JavaScript um. */
+      .hidden { display: none !important; }
+
+      /* ---- Statistik-Kacheln (offen / erledigt) ------------------------- */
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .stat {
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 14px; text-align: center;
+      }
+      .stat .num { font-size: 1.8rem; font-weight: 800; }
+      .stat .lbl { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+      .stat.open .num  { color: var(--accent); }
+      .stat.done .num  { color: var(--success); }
+      .stat.total .num { color: var(--accent-2); }
+
+      /* ---- XP-Balken-Optik: zeigt Fortschritt "erledigt / gesamt" ------- */
+      .xp { margin-top: 14px; }
+      .xp .xp-label {
+        display: flex; justify-content: space-between;
+        font-size: 0.8rem; color: var(--text-dim); margin-bottom: 6px;
+      }
+      .xp .bar {
+        height: 14px; background: var(--surface-2);
+        border: 1px solid var(--border); border-radius: 999px; overflow: hidden;
+      }
+      .xp .fill {
+        height: 100%; width: 0%;                 /* wird per JS gesetzt */
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        border-radius: 999px; transition: width 0.4s ease;
+        box-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
+      }
+
+      /* ====================================================================
+         3) EINTRAGS-LISTE
+         ==================================================================== */
+      .entry {
+        display: flex; align-items: flex-start; gap: 12px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 12px 14px; margin-top: 10px;
+        border-left: 4px solid var(--border); /* farbiger Streifen = Kategorie */
+      }
+      /* Kategorie-Streifen links (eine Farbe je Kategorie) */
+      .entry.cat-arbeit { border-left-color: var(--cat-arbeit); }
+      .entry.cat-alltag { border-left-color: var(--cat-alltag); }
+      .entry.cat-privat { border-left-color: var(--cat-privat); }
+      .entry.cat-ziel   { border-left-color: var(--cat-ziel); }
+
+      .entry .check {
+        flex: 0 0 auto; width: 26px; height: 26px; margin-top: 2px;
+        border-radius: 8px; border: 2px solid var(--border);
+        background: transparent; cursor: pointer; font-size: 0.9rem;
+        color: var(--success); display: grid; place-items: center;
+      }
+      .entry .check:hover { border-color: var(--success); }
+      .entry .body { flex: 1 1 auto; min-width: 0; }
+      .entry .row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .entry .name { font-weight: 700; }
+      /* erledigte Einträge werden durchgestrichen und abgedunkelt */
+      .entry.is-done .name { text-decoration: line-through; color: var(--text-dim); }
+
+      /* kleine Etiketten ("Badges") für Kategorie / Bereich / Deadline */
+      .badge {
+        font-size: 0.72rem; font-weight: 600; padding: 2px 8px;
+        border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
+      }
+      .badge.cat-arbeit { color: var(--cat-arbeit); border-color: var(--cat-arbeit); }
+      .badge.cat-alltag { color: var(--cat-alltag); border-color: var(--cat-alltag); }
+      .badge.cat-privat { color: var(--cat-privat); border-color: var(--cat-privat); }
+      .badge.cat-ziel   { color: var(--cat-ziel); border-color: var(--cat-ziel); }
+      .badge.area       { color: var(--accent-2); border-color: var(--accent-2); }
+      .badge.due-today  { color: #041014; background: var(--accent); border-color: transparent; }
+      .badge.overdue    { color: #2a0000; background: var(--danger); border-color: transparent; }
+
+      .entry .note { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; white-space: pre-wrap; }
+      .entry .meta { color: var(--text-dim); font-size: 0.75rem; margin-top: 4px; }
+
+      /* ---- Unterpunkte (subtasks), einklappbar -------------------------- */
+      .sub-toggle {
+        background: transparent; border: none; color: var(--accent);
+        cursor: pointer; font-size: 0.8rem; font-weight: 600;
+        margin-top: 6px; padding: 0;
+      }
+      .sub-toggle:hover { filter: brightness(1.15); }
+      .sub-list { list-style: none; margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+      .sub-item { display: flex; align-items: center; gap: 8px; }
+      .sub-check {
+        width: 20px; height: 20px; flex: 0 0 auto; border-radius: 5px;
+        border: 2px solid var(--border); background: transparent; cursor: pointer;
+        color: var(--success); display: grid; place-items: center; font-size: 0.7rem;
+      }
+      .sub-check:hover { border-color: var(--success); }
+      .sub-text { font-size: 0.85rem; color: var(--text); }
+      .sub-item.done .sub-text { text-decoration: line-through; color: var(--text-dim); }
+
+      /* Aktionsknöpfe (Bearbeiten / Löschen) rechts im Eintrag */
+      .entry .actions { flex: 0 0 auto; display: flex; gap: 6px; }
+      .icon-btn {
+        background: transparent; border: 1px solid var(--border);
+        border-radius: 8px; padding: 6px 8px; cursor: pointer; font-size: 0.9rem;
+        color: var(--text-dim);
+      }
+      .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+      .icon-btn.del:hover { color: var(--danger); border-color: var(--danger); }
+
+      /* Text, wenn eine Liste leer ist */
+      .empty { color: var(--text-dim); font-size: 0.9rem; padding: 8px 2px; }
+
+      /* ====================================================================
+         4) FILTER-LEISTE (nach Kategorie)
+         ==================================================================== */
+      .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+      .filter {
+        background: var(--surface-2); border: 1px solid var(--border);
+        color: var(--text-dim); border-radius: 999px; padding: 6px 12px;
+        font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      }
+      .filter.active { color: var(--text); border-color: var(--accent); background: rgba(34,211,238,0.1); }
+
+      /* ====================================================================
+         5) FORMULARE
+         ==================================================================== */
+      .field { margin-top: 12px; }
+      .field label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
+      .field input, .field select, .field textarea {
+        width: 100%; background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 10px 12px; font-size: 0.95rem; font-family: inherit;
+      }
+      .field input:focus, .field select:focus, .field textarea:focus {
+        outline: none; border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+      }
+      .field textarea { resize: vertical; min-height: 70px; }
+
+      /* Knöpfe unter dem Formular */
+      .form-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+      .btn {
+        border: none; border-radius: 10px; padding: 11px 18px;
+        font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      }
+      .btn.primary {
+        color: #041014;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      }
+      .btn.primary:hover { filter: brightness(1.1); }
+      .btn.ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+      .btn.ghost:hover { border-color: var(--accent); }
+
+      /* ====================================================================
+         6) SKILLS
+         Wir nutzen dieselben Design-Tokens (Farben) wie oben, damit der
+         Look konsistent bleibt.
+         ==================================================================== */
+      .skill-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-left: 4px solid var(--accent-2);   /* violetter Skill-Streifen */
+        border-radius: var(--radius); padding: 16px; margin-top: 12px;
+        box-shadow: var(--shadow);
+      }
+      .skill-head { display: flex; align-items: flex-start; gap: 10px; }
+      .skill-head > div:first-child { flex: 1 1 auto; min-width: 0; }
+      .skill-name { font-size: 1.1rem; font-weight: 800; }
+      .skill-dir { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; white-space: pre-wrap; }
+
+      /* Level-Badge + XP-Balken nebeneinander */
+      .level-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+      .level-badge {
+        flex: 0 0 auto; font-weight: 800; font-size: 0.8rem; color: #041014;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        padding: 5px 11px; border-radius: 999px; box-shadow: 0 0 12px rgba(168,85,247,0.4);
+      }
+      .level-row .xp { margin: 0; flex: 1 1 auto; }  /* .xp/.bar/.fill werden oben schon gestylt */
+
+      /* Meilenstein-Liste */
+      .ms-list { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+      .ms-item { display: flex; align-items: center; gap: 8px; }
+      .ms-check {
+        width: 22px; height: 22px; flex: 0 0 auto; border-radius: 6px;
+        border: 2px solid var(--border); background: transparent; cursor: pointer;
+        color: var(--success); display: grid; place-items: center; font-size: 0.8rem;
+      }
+      .ms-check:hover { border-color: var(--success); }
+      .ms-title { flex: 1 1 auto; font-size: 0.9rem; }
+      .ms-item.done .ms-title { text-decoration: line-through; color: var(--text-dim); }
+      .ms-del {
+        flex: 0 0 auto; background: transparent; border: none; color: var(--text-dim);
+        cursor: pointer; font-size: 0.9rem;
+      }
+      .ms-del:hover { color: var(--danger); }
+
+      /* Zeile zum Hinzufügen eines Meilensteins */
+      .ms-add { display: flex; gap: 6px; margin-top: 10px; }
+      .ms-add input {
+        flex: 1 1 auto; background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 0.85rem;
+      }
+      .ms-add input:focus { outline: none; border-color: var(--accent-2); }
+      .ms-add button {
+        flex: 0 0 auto; background: var(--surface-2); color: var(--text-dim);
+        border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px;
+        cursor: pointer; font-weight: 700;
+      }
+      .ms-add button:hover { color: var(--text); border-color: var(--accent-2); }
+
+      /* Aktionen + Übungseinheit-Button (mit optionalem Notizfeld) */
+      .skill-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      .unit-note-input {
+        flex: 1 1 180px; background: var(--surface-2); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font-size: 0.85rem;
+      }
+      .unit-note-input:focus { outline: none; border-color: var(--accent); }
+      .unit-btn {
+        flex: 0 0 auto;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #041014;
+        border: none; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer;
+      }
+      .unit-btn:hover { filter: brightness(1.1); }
+      .unit-count { color: var(--text-dim); font-size: 0.85rem; flex-basis: 100%; }
+
+      /* Kleine Historie der letzten Einheiten */
+      .history { margin-top: 14px; }
+      .history .h-title { color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+      .history .h-item {
+        display: inline-block; font-size: 0.78rem; color: var(--text);
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 3px 9px; margin: 0 6px 6px 0;
+      }
+      .history .h-empty { color: var(--text-dim); font-size: 0.82rem; }
+
+      /* Hinweis-Banner (z. B. nach Daten-Migration) */
+      .notice {
+        background: rgba(168, 85, 247, 0.12); border: 1px solid var(--accent-2);
+        color: var(--text); border-radius: var(--radius); padding: 12px 14px;
+        margin-top: 16px; font-size: 0.88rem; display: flex; gap: 10px; align-items: flex-start;
+      }
+      .notice button {
+        margin-left: auto; flex: 0 0 auto; background: transparent;
+        border: 1px solid var(--border); color: var(--text-dim);
+        border-radius: 8px; padding: 4px 9px; cursor: pointer;
+      }
+      .notice button:hover { color: var(--text); border-color: var(--accent-2); }
+      /* Warn-Variante (rot) für sicherheitsrelevante Hinweise */
+      .notice.warn { background: rgba(248, 113, 113, 0.12); border-color: var(--danger); }
+      /* Info-Variante (cyan) z. B. für die Quelle der Erkennung */
+      .notice.info2 { background: rgba(34, 211, 238, 0.10); border-color: var(--accent); }
+
+      /* ====================================================================
+         7) SCHNELLEINGABE (Vorschau-Karten)
+         ==================================================================== */
+      .q-task {
+        display: flex; gap: 10px; align-items: flex-start;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 12px; margin-top: 10px;
+      }
+      .q-task.excluded { opacity: 0.45; }
+      .q-include { width: 20px; height: 20px; margin-top: 4px; flex: 0 0 auto; accent-color: var(--accent); cursor: pointer; }
+      .q-task-body { flex: 1 1 auto; min-width: 0; }
+      .q-title-input {
+        width: 100%; background: var(--surface); color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 8px 10px; font-size: 0.95rem; font-weight: 700;
+      }
+      .q-title-input:focus { outline: none; border-color: var(--accent); }
+      .q-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .q-sub-list { list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+      .q-sub-list li { font-size: 0.85rem; color: var(--text-dim); }
+      .q-sub-list li::before { content: "↳ "; color: var(--accent); }
+      .q-note { color: var(--text-dim); font-size: 0.82rem; margin-top: 6px; white-space: pre-wrap; }
+
+      /* ====================================================================
+         8) HABITS
+         ==================================================================== */
+      /* Kleine Zwischenüberschrift (z. B. "Habits heute" im Dashboard) */
+      .block-sub {
+        color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;
+        letter-spacing: 1px; margin: 16px 0 2px;
+      }
+
+      .habit-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-left: 4px solid var(--success);   /* grüner Habit-Streifen */
+        border-radius: var(--radius); padding: 16px; margin-top: 12px;
+        box-shadow: var(--shadow);
+      }
+      /* Wenn heute schon erledigt: Streifen in Akzentfarbe */
+      .habit-card.done-today { border-left-color: var(--accent); }
+
+      .habit-progress { margin-top: 12px; color: var(--text-dim); font-size: 0.9rem; }
+      .habit-progress strong { color: var(--text); }
+
+      /* Monatsansicht: ein Kästchen pro Tag des aktuellen Monats */
+      .month-grid { margin-top: 16px; }
+      .mg-title {
+        color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;
+        letter-spacing: 1px; margin-bottom: 8px;
+      }
+      .mg-cells { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+      .mg-weekday { font-size: 0.62rem; color: var(--text-dim); text-align: center; padding-bottom: 2px; }
+      .mg-cell {
+        aspect-ratio: 1 / 1; border-radius: 6px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        display: grid; place-items: center; font-size: 0.7rem; color: var(--text-dim);
+      }
+      /* erledigte Tage farbig hervorgehoben */
+      .mg-cell.done {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #041014; border-color: transparent; font-weight: 700;
+      }
+      /* heutiger Tag deutlich umrandet */
+      .mg-cell.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+      /* Leer-Kästchen vor dem Monatsersten (für die Wochentags-Ausrichtung) */
+      .mg-cell.blank { background: transparent; border: none; }
+
+      /* ====================================================================
+         9) DASHBOARD: Kategorie-Kacheln, kompakte Zeilen, Habit-Chips
+         ==================================================================== */
+      /* Zähler-Kacheln (eine Reihe, anklickbar) */
+      .cat-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+      .cat-tile {
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-top: 3px solid var(--border); border-radius: 10px;
+        padding: 8px 6px; text-align: center; cursor: pointer; color: var(--text);
+        font-family: inherit;
+      }
+      .cat-tile .ct-num { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+      .cat-tile .ct-lbl { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+      /* je Kategorie die passende Farbe (Oberkante + Zahl) */
+      .cat-tile.cat-arbeit { border-top-color: var(--cat-arbeit); }
+      .cat-tile.cat-arbeit .ct-num { color: var(--cat-arbeit); }
+      .cat-tile.cat-privat { border-top-color: var(--cat-privat); }
+      .cat-tile.cat-privat .ct-num { color: var(--cat-privat); }
+      .cat-tile.cat-ziel { border-top-color: var(--cat-ziel); }
+      .cat-tile.cat-ziel .ct-num { color: var(--cat-ziel); }
+      /* aktive (angetippte) Kachel */
+      .cat-tile.active { border-color: var(--text); box-shadow: inset 0 0 0 2px rgba(230, 237, 243, 0.12); }
+
+      /* Kompaktere Zeile fürs Dashboard */
+      .entry.compact { padding: 8px 12px; margin-top: 8px; gap: 10px; }
+      .entry.compact .check { width: 22px; height: 22px; }
+
+      /* "+N weitere"-Button */
+      .more-btn {
+        margin-top: 8px; width: 100%;
+        background: var(--surface-2); color: var(--accent);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 7px 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      }
+      .more-btn:hover { border-color: var(--accent); }
+
+      /* Habit-Chips (schmal, statt großer Karten) */
+      .habit-chips { display: flex; flex-wrap: wrap; }
+      .habit-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 5px 10px; margin: 0 6px 6px 0;
+        font-size: 0.82rem; color: var(--text); cursor: pointer; font-family: inherit;
+      }
+      .habit-chip:hover { border-color: var(--success); }
+      .habit-chip .chip-check { color: var(--success); }
+      .habit-chip .chip-streak { color: var(--text-dim); font-size: 0.75rem; }
+
+      /* Auf schmalen Bildschirmen die Kachel-Zahlen etwas kleiner */
+      @media (max-width: 520px) {
+        .cat-tile .ct-num { font-size: 1.3rem; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <!-- ================================================================
+           KOPFZEILE + NAVIGATION
+           ================================================================ -->
+      <header>
+        <div class="brand">
+          <span class="logo">🎮</span>
+          <div>
+            <div class="title">QUEST LOG</div>
+            <div class="sub">Deine Ziele &amp; To-dos</div>
+          </div>
+        </div>
+
+        <!-- Die Tabs schalten zwischen den Ansichten um.
+             data-view verweist auf die passende Ansicht unten. -->
+        <nav class="tabs">
+          <button class="tab active" data-view="dashboard">📊 Dashboard</button>
+          <button class="tab" data-view="all">📋 Alle Einträge</button>
+          <button class="tab" data-view="skills">🧠 Skills</button>
+          <button class="tab" data-view="habits">🔁 Habits</button>
+          <button class="tab" data-view="form">➕ Neuer Eintrag</button>
+          <button class="tab" data-view="quick">⚡ Schnelleingabe</button>
+          <button class="tab" data-view="settings">⚙️ Einstellungen</button>
+        </nav>
+      </header>
+
+      <!-- ================================================================
+           ANSICHT 1: DASHBOARD
+           ================================================================ -->
+      <section id="view-dashboard">
+        <!-- Kompakte Tagesübersicht: Kategorie-Kacheln + Aufgaben + Habits.
+             Ziel: Kacheln, heutige Aufgaben und Habits ohne Scrollen sichtbar. -->
+        <div class="panel">
+          <h2>🔥 Heute</h2>
+          <p class="hint">
+            Überfällige zuerst, dann heute fällige, dann der Rest.
+            Tippe eine Kachel, um die Liste auf die Kategorie zu filtern.
+          </p>
+
+          <!-- Zähler-Kacheln pro Kategorie (Arbeit/Privat/Ziele), per JS gefüllt -->
+          <div class="cat-tiles" id="cat-tiles"></div>
+
+          <!-- Tagesliste (max. 5 sichtbar, Rest hinter "+N weitere") -->
+          <div id="day-list"></div>
+          <button class="more-btn hidden" id="day-more"></button>
+
+          <!-- Heute fällige Habits als schmale Chips -->
+          <div id="due-habits-wrap" class="hidden">
+            <div class="block-sub">🔁 Habits heute</div>
+            <div id="due-habits" class="habit-chips"></div>
+          </div>
+        </div>
+
+        <!-- Fortschritt gesamt + Wochenvorschau (weiter unten, darf scrollen) -->
+        <div class="panel">
+          <div class="xp">
+            <div class="xp-label">
+              <span>Fortschritt gesamt</span>
+              <span id="xp-text">0 / 0</span>
+            </div>
+            <div class="bar"><div class="fill" id="xp-fill"></div></div>
+          </div>
+
+          <h2 style="margin-top: 18px">🗓️ Diese Woche fällig</h2>
+          <p class="hint">Offene Einträge mit Deadline in den nächsten 7 Tagen.</p>
+          <div id="due-week"></div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT 2: ALLE EINTRÄGE (mit Kategorie-Filter)
+           ================================================================ -->
+      <section id="view-all" class="hidden">
+        <div class="panel">
+          <h2>Alle Einträge</h2>
+          <p class="hint">Filtere nach Kategorie.</p>
+
+          <!-- Filter-Knöpfe. data-filter = welche Kategorie gezeigt wird. -->
+          <div class="filters">
+            <button class="filter active" data-filter="all">Alle</button>
+            <button class="filter" data-filter="arbeit">💼 Arbeit</button>
+            <button class="filter" data-filter="privat">👤 Privat</button>
+            <button class="filter" data-filter="ziel">🏆 Langfristiges Ziel</button>
+          </div>
+
+          <!-- Hierhin schreibt JavaScript die gefilterte Liste -->
+          <div id="all-list"></div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT: SKILLS
+           ================================================================ -->
+      <section id="view-skills" class="hidden">
+        <div class="panel">
+          <h2>🧠 Skills</h2>
+          <p class="hint">Baue Fähigkeiten auf, sammle XP und steige im Level.</p>
+          <button class="btn primary" id="sk-new-btn">➕ Neuer Skill</button>
+        </div>
+
+        <!-- Hinweis-Banner, falls alte Skills migriert wurden (per JS befüllt) -->
+        <div id="sk-migration-notice"></div>
+
+        <!-- Formular für einen neuen Skill (versteckt bis "Neuer Skill") -->
+        <div class="panel hidden" id="sk-form-panel">
+          <h2>Neuer Skill</h2>
+          <p class="hint">Name und Bereich sind Pflicht. Meilensteine kannst du auch später je Karte ergänzen.</p>
+
+          <div class="field">
+            <label for="sk-name">Name *</label>
+            <input type="text" id="sk-name" placeholder="z. B. Liegestütze" />
+          </div>
+
+          <div class="field">
+            <label for="sk-area">Bereich *</label>
+            <select id="sk-area">
+              <option value="work">💼 Beruflich</option>
+              <option value="languages">🗣️ Sprachen</option>
+              <option value="sport">🏃 Sport</option>
+              <option value="music">🎵 Musik</option>
+              <option value="reading">📚 Lesen</option>
+              <option value="creative">🎨 Kreatives</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="sk-direction">Richtung / Notiz</label>
+            <textarea id="sk-direction" placeholder="z. B. Kraft aufbauen Richtung 100 Liegestütze"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Erste Meilensteine (optional, bis zu 3)</label>
+            <input type="text" class="sk-ms-input" placeholder="Meilenstein 1 (z. B. 20 am Stück)" style="margin-bottom: 8px" />
+            <input type="text" class="sk-ms-input" placeholder="Meilenstein 2 (z. B. 50 am Stück)" style="margin-bottom: 8px" />
+            <input type="text" class="sk-ms-input" placeholder="Meilenstein 3 (z. B. 100 am Stück)" />
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="sk-save">💾 Skill erstellen</button>
+            <button class="btn ghost" id="sk-cancel">Abbrechen</button>
+          </div>
+        </div>
+
+        <!-- Hierhin schreibt JavaScript die Skill-Karten -->
+        <div id="sk-list"></div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT: HABITS (wiederkehrende Aktivitäten)
+           ================================================================ -->
+      <section id="view-habits" class="hidden">
+        <div class="panel">
+          <h2>🔁 Habits</h2>
+          <p class="hint">
+            Wiederkehrende Aktivitäten. Ein mit einem Skill verknüpfter Habit zahlt
+            beim Abhaken automatisch eine Übungseinheit (+5 XP) in diesen Skill ein.
+          </p>
+          <button class="btn primary" id="hb-new-btn">➕ Neuer Habit</button>
+        </div>
+
+        <!-- Formular für einen neuen Habit (versteckt bis "Neuer Habit") -->
+        <div class="panel hidden" id="hb-form-panel">
+          <h2>Neuer Habit</h2>
+
+          <div class="field">
+            <label for="hb-name">Name *</label>
+            <input type="text" id="hb-name" placeholder="z. B. Vokabeln lernen" />
+          </div>
+
+          <div class="field">
+            <label for="hb-frequency">Frequenz</label>
+            <select id="hb-frequency">
+              <option value="daily">Täglich</option>
+              <option value="weekly">X-mal pro Woche</option>
+            </select>
+          </div>
+
+          <!-- Nur sichtbar, wenn "X-mal pro Woche" gewählt ist -->
+          <div class="field hidden" id="hb-perweek-field">
+            <label for="hb-perweek">Mal pro Woche</label>
+            <input type="number" id="hb-perweek" min="1" max="7" value="3" />
+          </div>
+
+          <div class="field">
+            <label for="hb-skill">Mit Skill verknüpfen (optional)</label>
+            <select id="hb-skill">
+              <option value="">— kein Skill —</option>
+              <!-- weitere Optionen füllt JavaScript aus der Skill-Liste -->
+            </select>
+            <p class="hint" style="margin-top: 6px">
+              Abhaken erzeugt dann automatisch eine Übungseinheit im Skill.
+            </p>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="hb-save">💾 Habit erstellen</button>
+            <button class="btn ghost" id="hb-cancel">Abbrechen</button>
+          </div>
+        </div>
+
+        <!-- Hierhin schreibt JavaScript die Habit-Karten -->
+        <div id="hb-list"></div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT 3: FORMULAR (neuer Eintrag ODER bearbeiten)
+           ================================================================ -->
+      <section id="view-form" class="hidden">
+        <div class="panel">
+          <!-- Diese Überschrift wechselt je nach "neu" / "bearbeiten" -->
+          <h2 id="form-title">Neuer Eintrag</h2>
+          <p class="hint">Fülle die Felder aus. Nur der Titel ist Pflicht.</p>
+
+          <!-- Unsichtbares Feld: merkt sich, welchen Eintrag wir bearbeiten.
+               Leer = wir erstellen einen neuen Eintrag. -->
+          <input type="hidden" id="f-id" />
+
+          <div class="field">
+            <label for="f-title">Titel *</label>
+            <input type="text" id="f-title" placeholder="z. B. 30 Min Gitarre üben" />
+          </div>
+
+          <div class="field">
+            <label for="f-category">Kategorie</label>
+            <select id="f-category">
+              <option value="arbeit">💼 Arbeit</option>
+              <option value="privat">👤 Privat</option>
+              <option value="ziel">🏆 Langfristiges Ziel</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-deadline">Deadline (optional)</label>
+            <input type="date" id="f-deadline" />
+          </div>
+
+          <div class="field">
+            <label for="f-note">Notiz (optional)</label>
+            <textarea id="f-note" placeholder="Freitext, Details, Gedanken ..."></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="f-save">💾 Speichern</button>
+            <button class="btn ghost" id="f-cancel">Abbrechen</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT: SCHNELLEINGABE (mehrere Aufgaben auf einmal)
+           ================================================================ -->
+      <section id="view-quick" class="hidden">
+        <div class="panel">
+          <h2>⚡ Schnelleingabe</h2>
+          <p class="hint">
+            Schreib einfach drauflos (z. B. aus einer Mail kopiert). Mit hinterlegtem
+            API-Key erkennt Claude Aufgaben, Unterpunkte, Kategorien, Deadlines und
+            Habits automatisch aus dem Fließtext. Ohne Key greift der regelbasierte
+            Parser (Zeile = Aufgabe; <code>-</code>/<code>*</code>/Einrückung = Unterpunkt;
+            <code>@arbeit</code>/<code>@privat</code>/<code>@ziel</code>;
+            <code>!2026-11-05</code>). Den Key hinterlegst du unter „⚙️ Einstellungen".
+          </p>
+
+          <div class="field">
+            <label for="q-input">Text</label>
+            <textarea id="q-input" rows="10" style="min-height: 200px"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="q-preview-btn">👁️ Vorschau</button>
+            <button class="btn ghost" id="q-clear-btn">Leeren</button>
+          </div>
+        </div>
+
+        <!-- Vorschau-Bereich (versteckt bis "Vorschau" geklickt wurde) -->
+        <div class="panel hidden" id="q-preview-panel">
+          <h2>Vorschau</h2>
+          <p class="hint">Haken entfernen = nicht übernehmen. Titel/Namen sind direkt editierbar.</p>
+          <!-- Zeigt, ob per Claude API oder per Fallback-Parser erkannt wurde -->
+          <div id="q-source"></div>
+          <div id="q-preview-list"></div>
+          <div class="form-actions">
+            <button class="btn primary" id="q-apply-btn">✅ Übernehmen</button>
+            <button class="btn ghost" id="q-back-btn">Zurück</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================
+           ANSICHT: EINSTELLUNGEN (API-Key)
+           ================================================================ -->
+      <section id="view-settings" class="hidden">
+        <div class="panel">
+          <h2>⚙️ Einstellungen</h2>
+
+          <!-- Deutliche Warnung: nur lokale Nutzung -->
+          <div class="notice warn">
+            <span>⚠️ <strong>Nur für die lokale Nutzung gedacht.</strong> Diese Datei ruft die
+            Claude API direkt aus dem Browser auf. Dein API-Key wird ausschließlich in deinem
+            Browser (localStorage) gespeichert und steht <strong>nicht</strong> im Code. Gib diese
+            Datei und deinen Key nicht weiter und stelle sie nicht öffentlich ins Netz — im Browser
+            ist der Key für Skripte der Seite sichtbar. Für einen echten Mehrbenutzer-Einsatz gehört
+            der Aufruf später hinter ein eigenes Backend.</span>
+          </div>
+
+          <div class="field">
+            <label for="set-apikey">Anthropic API-Key</label>
+            <input type="password" id="set-apikey" placeholder="sk-ant-..." autocomplete="off" />
+          </div>
+
+          <div class="hint" id="set-status">Kein API-Key gespeichert.</div>
+
+          <div class="form-actions">
+            <button class="btn primary" id="set-save">💾 Speichern</button>
+            <button class="btn ghost" id="set-clear">Key löschen</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      /* ====================================================================
+         JAVASCRIPT — die Logik der App
+         --------------------------------------------------------------------
+         Ablauf:
+           A) Daten laden (aus localStorage) + alte Daten migrieren
+           B) Funktionen zum Speichern, Anzeigen, Erstellen, Bearbeiten, Löschen
+           C) Ereignisse (Klicks) mit Funktionen verbinden
+           D) Erste Anzeige aufbauen
+         ==================================================================== */
+
+      /* --------------------------------------------------------------------
+         A) DATENMODELL & SPEICHER
+         --------------------------------------------------------------------
+         Eintrag (Aufgabe / To-do):
+           {
+             id, title,
+             category:  "arbeit" | "privat" | "ziel",
+             deadline:  "2026-11-05" | null,
+             status:    "offen" | "erledigt",
+             createdAt: "2026-10-05T10:00:00.000Z",
+             note:      "Freitext",
+             subtasks:  [ { title, done } ]   // Unterpunkte (einklappbar)
+           }
+
+         Skill (langfristiger Kompetenzaufbau):
+           {
+             id, name,
+             area:      "work"|"languages"|"sport"|"music"|"reading"|"creative", // Pflicht
+             direction: "Richtung/Notiz",
+             milestones:[ { id, title, done } ],
+             log:       [ { date, note } ]     // 1 Objekt je Übungseinheit
+           }
+
+         XP    = (Anzahl Übungseinheiten × 5) + (Anzahl erreichter Meilensteine × 20)
+         Level = XP / 100, abgerundet
+
+         Habit (wiederkehrende Aktivität):
+           {
+             id, name,
+             frequency:   "daily" | "weekly",
+             timesPerWeek: Zahl | null,          // nur bei "weekly" genutzt
+             skillId:     id | null,             // optionale Kopplung an einen Skill
+             completions: [ { date, logId } ]    // je erledigtem Tag ein Eintrag
+           }
+         Beim Abhaken eines Habits mit skillId wird automatisch ein Eintrag im
+         Log des Skills erzeugt ({ date, note: "Habit: <name>" }); die "logId"
+         merkt sich diesen, damit er beim Rückgängigmachen wieder entfernt wird.
+         -------------------------------------------------------------------- */
+
+      // Schlüssel, unter denen wir im Browser speichern.
+      const STORAGE_KEY   = "questlog.entries.v1";
+      const SKILLS_KEY    = "questlog.skills.v1";
+      const HABITS_KEY    = "questlog.habits.v1";
+      const SETTINGS_KEY  = "questlog.settings.v1";
+
+      // Standard-Bereich für Skills, die beim Laden noch keinen "area" haben.
+      const DEFAULT_AREA = "work";
+
+      // Zählt beim Laden, wie viele alte Skills auf den Default gesetzt wurden
+      // (für den Hinweis-Banner). Muss VOR loadSkills() existieren.
+      let skillsDefaultedCount = 0;
+
+      // Lesbare Namen + Icons für Kategorien (Anzeige deutsch, Werte englisch gibt es hier nicht –
+      // die Kategorien sind bewusst deutsche Schlüssel laut Plan).
+      const CATEGORY_INFO = {
+        arbeit: { label: "Arbeit", icon: "💼" },
+        privat: { label: "Privat", icon: "👤" },
+        ziel:   { label: "Langfristiges Ziel", icon: "🏆" },
+      };
+
+      // Lesbare Namen + Icons für Skill-Bereiche (Werte englisch, Anzeige deutsch).
+      const AREA_INFO = {
+        work:      { label: "Beruflich", icon: "💼" },
+        languages: { label: "Sprachen", icon: "🗣️" },
+        sport:     { label: "Sport", icon: "🏃" },
+        music:     { label: "Musik", icon: "🎵" },
+        reading:   { label: "Lesen", icon: "📚" },
+        creative:  { label: "Kreatives", icon: "🎨" },
+      };
+
+      // Die Haupt-Datenlisten (jede in einem EIGENEN localStorage-Schlüssel).
+      let entries = loadEntries();
+      let skills = loadSkills();
+      let habits = loadHabits();
+      let settings = loadSettings(); // enthält u. a. den API-Key
+
+      // Merkt sich den aktuell gewählten Kategorie-Filter in Ansicht 2.
+      let activeFilter = "all";
+
+      // Dashboard-Zustand: aktive Kachel-Filterung und ob die Tagesliste
+      // aufgeklappt ("+N weitere") ist.
+      let dashFilter = null;        // null | "arbeit" | "privat" | "ziel"
+      let dayListExpanded = false;
+
+      // Merkt sich, welche Einträge ihre Unterpunkte aufgeklappt haben
+      // (damit der Zustand ein Neu-Zeichnen übersteht).
+      const expandedEntries = new Set();
+
+      // Zwischenspeicher für die Schnelleingabe-Vorschau.
+      let quickTasks = [];              // erkannte Aufgaben
+      let quickHabits = [];             // erkannte Habits
+      let quickSource = "rule";         // "ai" (Claude API) oder "rule" (Fallback)
+
+      /* ---- Laden + Migrieren --------------------------------------------- */
+
+      // Liest Einträge aus localStorage und bringt alte Daten auf das neue Format.
+      function loadEntries() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          if (!Array.isArray(data)) return [];
+          return data.map(migrateEntry);
+        } catch (err) {
+          console.warn("Konnte Daten nicht laden:", err);
+          return [];
+        }
+      }
+
+      // Migration eines einzelnen Eintrags (verändert alte Daten verträglich):
+      //  - entfernt das tote Feld "skillData"
+      //  - alte Kategorie "skill" wird zu "ziel"
+      //  - stellt sicher, dass "subtasks" ein Array ist
+      function migrateEntry(e) {
+        const copy = Object.assign({}, e);
+        delete copy.skillData;                       // totes Feld entfernen
+        if (copy.category === "skill") copy.category = "ziel";   // skill -> ziel
+        if (copy.category === "alltag") copy.category = "privat"; // Alltag -> Privat (zusammengelegt)
+        if (!Array.isArray(copy.subtasks)) copy.subtasks = []; // neues Feld
+        return copy;
+      }
+
+      // Liest Skills aus localStorage und migriert alte Daten.
+      function loadSkills() {
+        try {
+          const raw = localStorage.getItem(SKILLS_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          if (!Array.isArray(data)) return [];
+          return data.map(migrateSkill);
+        } catch (err) {
+          console.warn("Konnte Skills nicht laden:", err);
+          return [];
+        }
+      }
+
+      // Migration eines einzelnen Skills:
+      //  - setzt fehlendes Pflichtfeld "area" auf den Default (und zählt das)
+      //  - wandelt altes Log (reine Zeitstempel-Strings) in Objekte { date, note } um
+      //  - stellt sicher, dass milestones/log Arrays sind
+      function migrateSkill(s) {
+        const copy = Object.assign({}, s);
+
+        if (!copy.area) {
+          copy.area = DEFAULT_AREA;
+          skillsDefaultedCount++;
+        }
+
+        if (!Array.isArray(copy.milestones)) copy.milestones = [];
+
+        if (Array.isArray(copy.log)) {
+          copy.log = copy.log.map((entry) =>
+            typeof entry === "string"
+              ? { date: entry, note: "" }   // alter Zeitstempel -> Objekt
+              : entry                        // schon ein Objekt -> unverändert
+          );
+        } else {
+          copy.log = [];
+        }
+
+        return copy;
+      }
+
+      // Schreibt die aktuelle Einträge-Liste zurück in localStorage.
+      function saveEntries() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+        } catch (err) {
+          console.warn("Konnte Daten nicht speichern:", err);
+        }
+      }
+
+      // Schreibt die Skill-Liste zurück in localStorage.
+      function saveSkills() {
+        try {
+          localStorage.setItem(SKILLS_KEY, JSON.stringify(skills));
+        } catch (err) {
+          console.warn("Konnte Skills nicht speichern:", err);
+        }
+      }
+
+      // Erzeugt eine einfache, ausreichend eindeutige ID.
+      function makeId() {
+        return "id-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+      }
+
+      /* --------------------------------------------------------------------
+         DATUMS-HILFEN
+         Wir vergleichen Datumsangaben als reine "YYYY-MM-DD"-Texte. Das ist
+         einfach und vermeidet Verwirrung mit Uhrzeiten/Zeitzonen.
+         -------------------------------------------------------------------- */
+
+      function todayISO() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      function isoInDays(n) {
+        const d = new Date();
+        d.setDate(d.getDate() + n);
+        return isoFromDate(d);
+      }
+
+      // Formatiert ein Date-Objekt als "YYYY-MM-DD" (lokale Zeit).
+      function isoFromDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      /* --------------------------------------------------------------------
+         B) ANZEIGE ("Rendering")
+         -------------------------------------------------------------------- */
+
+      function render() {
+        renderDashboard();
+        renderAllList();
+        renderSkills();
+        renderHabits();
+      }
+
+      // Baut Statistik-Kacheln, XP-Balken und die beiden Fällig-Listen.
+      function renderDashboard() {
+        renderCatTiles();
+        renderDayList();
+        renderDashHabits();
+        renderWeekAndXp();
+      }
+
+      // Priorität einer Aufgabe für die Tagesliste: 0=überfällig, 1=heute, 2=Rest.
+      function dayBucket(e) {
+        const today = todayISO();
+        if (e.deadline && e.deadline < today) return 0;
+        if (e.deadline === today) return 1;
+        return 2;
+      }
+
+      // Reihenfolge der Kategorien innerhalb eines Prioritäts-Blocks (Arbeit zuerst).
+      const DAY_CAT_ORDER = { arbeit: 0, privat: 1, ziel: 2 };
+
+      // Zähler-Kacheln (nur Arbeit/Privat/Ziele). Zahl = heute offene Aufgaben
+      // der Kategorie (überfällig oder heute fällig). Klick filtert die Tagesliste.
+      function renderCatTiles() {
+        const box = document.getElementById("cat-tiles");
+        const today = todayISO();
+        const tiles = [
+          { key: "arbeit", label: "Arbeit", icon: "💼" },
+          { key: "privat", label: "Privat", icon: "👤" },
+          { key: "ziel", label: "Ziele", icon: "🏆" },
+        ];
+        box.innerHTML = "";
+        tiles.forEach((t) => {
+          // "heute offen" = offen UND Deadline <= heute (überfällig oder heute).
+          const count = entries.filter(
+            (e) =>
+              e.status === "offen" &&
+              e.category === t.key &&
+              e.deadline &&
+              e.deadline <= today
+          ).length;
+
+          const el = document.createElement("button");
+          el.className = "cat-tile cat-" + t.key + (dashFilter === t.key ? " active" : "");
+          el.innerHTML = `<div class="ct-num">${count}</div><div class="ct-lbl">${t.icon} ${t.label}</div>`;
+          el.addEventListener("click", () => {
+            // Zweiter Klick auf dieselbe Kachel hebt den Filter wieder auf.
+            dashFilter = dashFilter === t.key ? null : t.key;
+            dayListExpanded = false; // beim Filterwechsel wieder einklappen
+            renderCatTiles();
+            renderDayList();
+          });
+          box.appendChild(el);
+        });
+      }
+
+      // Tagesliste: alle offenen Aufgaben, priorisiert (und ggf. gefiltert),
+      // max. 5 sichtbar, Rest hinter "+N weitere".
+      function renderDayList() {
+        const container = document.getElementById("day-list");
+        const moreBtn = document.getElementById("day-more");
+        container.innerHTML = "";
+
+        let list = entries.filter((e) => e.status === "offen");
+        if (dashFilter) list = list.filter((e) => e.category === dashFilter);
+
+        // Sortierung: Priorität (überfällig->heute->Rest), dann Kategorie (Arbeit
+        // zuerst), dann Deadline (ohne Deadline ans Ende), dann Erstellungsdatum.
+        list = list.slice().sort((a, b) => {
+          if (dayBucket(a) !== dayBucket(b)) return dayBucket(a) - dayBucket(b);
+          const ca = DAY_CAT_ORDER[a.category] ?? 9;
+          const cb = DAY_CAT_ORDER[b.category] ?? 9;
+          if (ca !== cb) return ca - cb;
+          const da = a.deadline || "9999-12-31";
+          const db = b.deadline || "9999-12-31";
+          if (da !== db) return da.localeCompare(db);
+          return a.createdAt.localeCompare(b.createdAt);
+        });
+
+        if (list.length === 0) {
+          container.innerHTML = `<div class="empty">${
+            dashFilter ? "Keine offenen Aufgaben in dieser Kategorie." : "Nichts offen. 🎉"
+          }</div>`;
+          moreBtn.classList.add("hidden");
+          return;
+        }
+
+        const LIMIT = 5;
+        const visible = dayListExpanded ? list : list.slice(0, LIMIT);
+        visible.forEach((e) => container.appendChild(buildEntryElement(e, true)));
+
+        // "+N weitere" nur, wenn es mehr als 5 gibt.
+        const extra = list.length - LIMIT;
+        if (extra > 0) {
+          moreBtn.classList.remove("hidden");
+          moreBtn.textContent = dayListExpanded ? "▲ Weniger anzeigen" : `+${extra} weitere`;
+        } else {
+          moreBtn.classList.add("hidden");
+        }
+      }
+
+      // Heute fällige Habits als schmale Chips (Name + Streak), nicht als Karten.
+      function renderDashHabits() {
+        const wrap = document.getElementById("due-habits-wrap");
+        const box = document.getElementById("due-habits");
+        box.innerHTML = "";
+        const due = habits.filter(isHabitDueToday);
+        if (due.length === 0) {
+          wrap.classList.add("hidden");
+          return;
+        }
+        wrap.classList.remove("hidden");
+        due.forEach((h) => box.appendChild(buildHabitChip(h)));
+      }
+
+      function buildHabitChip(habit) {
+        const chip = document.createElement("button");
+        chip.className = "habit-chip";
+        const streakLabel =
+          habit.frequency === "daily"
+            ? `🔥 ${dailyStreak(habit)}`
+            : `${weeklyCount(habit)}/${habit.timesPerWeek || 1}`;
+        chip.innerHTML =
+          `<span class="chip-check">○</span>` +
+          `<span>${escapeHtml(habit.name)}</span>` +
+          `<span class="chip-streak">${streakLabel}</span>`;
+        // Klick = heute abhaken (zahlt ggf. XP in den verknüpften Skill ein).
+        chip.addEventListener("click", () => toggleHabitToday(habit.id));
+        return chip;
+      }
+
+      // Fortschrittsbalken (gesamt) + Wochenvorschau.
+      function renderWeekAndXp() {
+        const total = entries.length;
+        const doneCount = entries.filter((e) => e.status === "erledigt").length;
+        const percent = total === 0 ? 0 : Math.round((doneCount / total) * 100);
+        document.getElementById("xp-fill").style.width = percent + "%";
+        document.getElementById("xp-text").textContent = `${doneCount} / ${total} (${percent}%)`;
+
+        const today = todayISO();
+        const weekEnd = isoInDays(7);
+        const dueWeek = entries.filter(
+          (e) => e.status === "offen" && e.deadline && e.deadline >= today && e.deadline <= weekEnd
+        );
+        dueWeek.sort((a, b) => a.deadline.localeCompare(b.deadline));
+        renderInto("due-week", dueWeek, "Diese Woche steht nichts an.");
+      }
+
+      // Baut die Liste in Ansicht 2, gefiltert nach der gewählten Kategorie.
+      function renderAllList() {
+        let list = entries;
+        if (activeFilter !== "all") {
+          list = entries.filter((e) => e.category === activeFilter);
+        }
+        list = list.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        renderInto("all-list", list, "Keine Einträge in dieser Kategorie.");
+      }
+
+      // Hilfsfunktion: schreibt eine Liste von Einträgen in einen Container.
+      function renderInto(containerId, list, emptyText) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+        if (list.length === 0) {
+          container.innerHTML = `<div class="empty">${emptyText}</div>`;
+          return;
+        }
+        list.forEach((entry) => container.appendChild(buildEntryElement(entry)));
+      }
+
+      // Baut das HTML-Element für EINEN Eintrag.
+      // compact=true: schlankere Zeile fürs Dashboard (ohne "Erstellt am"-Zeile).
+      function buildEntryElement(entry, compact) {
+        const isDone = entry.status === "erledigt";
+        const catInfo = CATEGORY_INFO[entry.category] || { label: entry.category, icon: "•" };
+
+        // Deadline-Badge (überfällig / heute / normales Datum).
+        let deadlineBadge = "";
+        if (entry.deadline) {
+          const today = todayISO();
+          if (!isDone && entry.deadline < today) {
+            deadlineBadge = `<span class="badge overdue">⚠️ überfällig: ${formatDate(entry.deadline)}</span>`;
+          } else if (!isDone && entry.deadline === today) {
+            deadlineBadge = `<span class="badge due-today">🔥 heute</span>`;
+          } else {
+            deadlineBadge = `<span class="badge">📅 ${formatDate(entry.deadline)}</span>`;
+          }
+        }
+
+        const noteHtml = entry.note
+          ? `<div class="note">${escapeHtml(entry.note)}</div>`
+          : "";
+
+        // Unterpunkte (einklappbar).
+        const subs = Array.isArray(entry.subtasks) ? entry.subtasks : [];
+        let subToggleHtml = "";
+        let subListHtml = "";
+        if (subs.length) {
+          const doneSubs = subs.filter((s) => s.done).length;
+          const expanded = expandedEntries.has(entry.id);
+          const arrow = expanded ? "▾" : "▸";
+          const word = subs.length === 1 ? "Unterpunkt" : "Unterpunkte";
+          subToggleHtml = `<button class="sub-toggle">${arrow} ${subs.length} ${word} (${doneSubs}/${subs.length})</button>`;
+          subListHtml =
+            `<ul class="sub-list ${expanded ? "" : "hidden"}">` +
+            subs
+              .map(
+                (s, i) => `
+              <li class="sub-item ${s.done ? "done" : ""}" data-sub="${i}">
+                <button class="sub-check" title="Unterpunkt umschalten">${s.done ? "✓" : ""}</button>
+                <span class="sub-text">${escapeHtml(s.title)}</span>
+              </li>`
+              )
+              .join("") +
+            `</ul>`;
+        }
+
+        const el = document.createElement("div");
+        el.className =
+          "entry cat-" + entry.category + (isDone ? " is-done" : "") + (compact ? " compact" : "");
+        el.innerHTML = `
+          <button class="check" title="Als erledigt/offen umschalten">${isDone ? "✓" : ""}</button>
+          <div class="body">
+            <div class="row1">
+              <span class="name">${escapeHtml(entry.title)}</span>
+              <span class="badge cat-${entry.category}">${catInfo.icon} ${catInfo.label}</span>
+              ${deadlineBadge}
+            </div>
+            ${noteHtml}
+            ${subToggleHtml}
+            ${subListHtml}
+            ${compact ? "" : `<div class="meta">Erstellt am ${formatDate(entry.createdAt)}</div>`}
+          </div>
+          <div class="actions">
+            <button class="icon-btn edit" title="Bearbeiten">✏️</button>
+            <button class="icon-btn del" title="Löschen">🗑️</button>
+          </div>
+        `;
+
+        // Standard-Ereignisse.
+        el.querySelector(".check").addEventListener("click", () => toggleDone(entry.id));
+        el.querySelector(".edit").addEventListener("click", () => startEdit(entry.id));
+        el.querySelector(".del").addEventListener("click", () => deleteEntry(entry.id));
+
+        // Unterpunkt-Ereignisse (nur wenn es welche gibt).
+        if (subs.length) {
+          const toggleBtn = el.querySelector(".sub-toggle");
+          const listEl = el.querySelector(".sub-list");
+          const doneSubs = subs.filter((s) => s.done).length;
+          const word = subs.length === 1 ? "Unterpunkt" : "Unterpunkte";
+          toggleBtn.addEventListener("click", () => {
+            const isHidden = listEl.classList.toggle("hidden");
+            if (isHidden) expandedEntries.delete(entry.id);
+            else expandedEntries.add(entry.id);
+            toggleBtn.textContent = `${isHidden ? "▸" : "▾"} ${subs.length} ${word} (${doneSubs}/${subs.length})`;
+          });
+          el.querySelectorAll(".sub-item").forEach((li) => {
+            const idx = Number(li.dataset.sub);
+            li.querySelector(".sub-check").addEventListener("click", () => toggleSubtask(entry.id, idx));
+          });
+        }
+
+        return el;
+      }
+
+      function formatDate(value) {
+        const d = new Date(value);
+        if (isNaN(d)) return value;
+        return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      /* --------------------------------------------------------------------
+         AKTIONEN (Einträge): erstellen, bearbeiten, löschen, umschalten
+         -------------------------------------------------------------------- */
+
+      function saveForm() {
+        const id = document.getElementById("f-id").value;
+        const title = document.getElementById("f-title").value.trim();
+        const category = document.getElementById("f-category").value;
+        const deadline = document.getElementById("f-deadline").value || null;
+        const note = document.getElementById("f-note").value.trim();
+
+        if (!title) {
+          alert("Bitte gib einen Titel ein.");
+          return;
+        }
+
+        if (id) {
+          // Bearbeiten: vorhandenen Eintrag aktualisieren.
+          const entry = entries.find((e) => e.id === id);
+          if (entry) {
+            entry.title = title;
+            entry.category = category;
+            entry.deadline = deadline;
+            entry.note = note;
+            // status, createdAt und subtasks bleiben unverändert erhalten.
+          }
+        } else {
+          // Neu: ein frisches Eintrags-Objekt anlegen.
+          entries.push({
+            id: makeId(),
+            title: title,
+            category: category,
+            deadline: deadline,
+            status: "offen",
+            createdAt: new Date().toISOString(),
+            note: note,
+            subtasks: [],
+          });
+        }
+
+        saveEntries();
+        resetForm();
+        render();
+        switchView("all");
+      }
+
+      function startEdit(id) {
+        const entry = entries.find((e) => e.id === id);
+        if (!entry) return;
+        document.getElementById("f-id").value = entry.id;
+        document.getElementById("f-title").value = entry.title;
+        document.getElementById("f-category").value = entry.category;
+        document.getElementById("f-deadline").value = entry.deadline || "";
+        document.getElementById("f-note").value = entry.note || "";
+        document.getElementById("form-title").textContent = "Eintrag bearbeiten";
+        switchView("form");
+      }
+
+      function deleteEntry(id) {
+        const entry = entries.find((e) => e.id === id);
+        if (!entry) return;
+        if (!confirm(`„${entry.title}" wirklich löschen?`)) return;
+        entries = entries.filter((e) => e.id !== id);
+        saveEntries();
+        render();
+      }
+
+      function toggleDone(id) {
+        const entry = entries.find((e) => e.id === id);
+        if (!entry) return;
+        entry.status = entry.status === "erledigt" ? "offen" : "erledigt";
+        saveEntries();
+        render();
+      }
+
+      // Einen Unterpunkt (subtask) erledigt/offen schalten.
+      function toggleSubtask(entryId, index) {
+        const entry = entries.find((e) => e.id === entryId);
+        if (!entry || !Array.isArray(entry.subtasks) || !entry.subtasks[index]) return;
+        entry.subtasks[index].done = !entry.subtasks[index].done;
+        saveEntries();
+        renderAllList();   // Aufklapp-Zustand bleibt über expandedEntries erhalten
+        renderDayList();   // Dashboard-Tagesliste nutzt dieselben Zeilen
+      }
+
+      function resetForm() {
+        document.getElementById("f-id").value = "";
+        document.getElementById("f-title").value = "";
+        document.getElementById("f-category").value = "privat";
+        document.getElementById("f-deadline").value = "";
+        document.getElementById("f-note").value = "";
+        document.getElementById("form-title").textContent = "Neuer Eintrag";
+      }
+
+      /* --------------------------------------------------------------------
+         ANSICHTS-WECHSEL (Tabs)
+         -------------------------------------------------------------------- */
+
+      function switchView(view) {
+        document.getElementById("view-dashboard").classList.toggle("hidden", view !== "dashboard");
+        document.getElementById("view-all").classList.toggle("hidden", view !== "all");
+        document.getElementById("view-skills").classList.toggle("hidden", view !== "skills");
+        document.getElementById("view-form").classList.toggle("hidden", view !== "form");
+        document.getElementById("view-quick").classList.toggle("hidden", view !== "quick");
+        document.getElementById("view-habits").classList.toggle("hidden", view !== "habits");
+        document.getElementById("view-settings").classList.toggle("hidden", view !== "settings");
+
+        document.querySelectorAll(".tab").forEach((tab) => {
+          tab.classList.toggle("active", tab.dataset.view === view);
+        });
+
+        if (view !== "form") resetForm();
+        if (view !== "skills") hideSkillForm();
+        if (view !== "habits") hideHabitForm();
+        // Beim Öffnen der Einstellungen den aktuellen Key ins Feld spiegeln.
+        if (view === "settings") {
+          document.getElementById("set-apikey").value = getApiKey();
+          renderSettingsStatus();
+        }
+      }
+
+      /* --------------------------------------------------------------------
+         C) EREIGNISSE VERBINDEN
+         -------------------------------------------------------------------- */
+
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => switchView(tab.dataset.view));
+      });
+
+      document.querySelectorAll(".filter").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeFilter = btn.dataset.filter;
+          document.querySelectorAll(".filter").forEach((b) =>
+            b.classList.toggle("active", b === btn)
+          );
+          renderAllList();
+        });
+      });
+
+      // Dashboard: "+N weitere" / "Weniger anzeigen" umschalten.
+      document.getElementById("day-more").addEventListener("click", () => {
+        dayListExpanded = !dayListExpanded;
+        renderDayList();
+      });
+
+      document.getElementById("f-save").addEventListener("click", saveForm);
+      document.getElementById("f-cancel").addEventListener("click", () => {
+        resetForm();
+        switchView("all");
+      });
+      document.getElementById("f-title").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") saveForm();
+      });
+
+      /* ====================================================================
+         SKILLS
+         ==================================================================== */
+
+      function skillXp(skill) {
+        const units = skill.log.length;
+        const reached = skill.milestones.filter((m) => m.done).length;
+        return units * 5 + reached * 20;
+      }
+      function skillLevel(skill) {
+        return Math.floor(skillXp(skill) / 100);
+      }
+
+      function renderSkills() {
+        const list = document.getElementById("sk-list");
+        list.innerHTML = "";
+        if (skills.length === 0) {
+          list.innerHTML =
+            '<div class="panel"><div class="empty">Noch keine Skills. Klicke oben auf „Neuer Skill".</div></div>';
+          return;
+        }
+        skills.forEach((skill) => list.appendChild(buildSkillCard(skill)));
+      }
+
+      // Zeigt (einmalig) einen Hinweis, wenn beim Laden Skills migriert wurden.
+      function renderMigrationNotice() {
+        const box = document.getElementById("sk-migration-notice");
+        if (skillsDefaultedCount > 0) {
+          const n = skillsDefaultedCount;
+          box.innerHTML = `
+            <div class="notice">
+              <span>ℹ️ ${n} bestehende${n === 1 ? "r" : ""} Skill${n === 1 ? "" : "s"} wurde${n === 1 ? "" : "n"} auf den
+              Standard-Bereich „Beruflich" gesetzt, weil noch kein Bereich hinterlegt war.
+              Bitte pro Karte den passenden Bereich wählen.</span>
+              <button id="sk-notice-dismiss">OK</button>
+            </div>`;
+          document.getElementById("sk-notice-dismiss").addEventListener("click", () => {
+            box.innerHTML = "";
+          });
+        } else {
+          box.innerHTML = "";
+        }
+      }
+
+      function buildSkillCard(skill) {
+        const xp = skillXp(skill);
+        const level = skillLevel(skill);
+        const intoLevel = xp % 100;
+        const areaInfo = AREA_INFO[skill.area] || { label: skill.area || "–", icon: "•" };
+
+        const card = document.createElement("div");
+        card.className = "skill-card";
+
+        const msHtml = skill.milestones
+          .map(
+            (m) => `
+            <li class="ms-item ${m.done ? "done" : ""}" data-ms="${m.id}">
+              <button class="ms-check" title="Meilenstein umschalten">${m.done ? "✓" : ""}</button>
+              <span class="ms-title">${escapeHtml(m.title)}</span>
+              <button class="ms-del" title="Meilenstein löschen">✕</button>
+            </li>`
+          )
+          .join("");
+
+        // Historie: letzte 5 Einheiten (neueste zuerst), jeweils mit optionaler Notiz.
+        const recent = skill.log.slice().reverse().slice(0, 5);
+        const histHtml = recent.length
+          ? recent
+              .map(
+                (e) =>
+                  `<span class="h-item">🗓️ ${formatDate(e.date)}${e.note ? " · " + escapeHtml(e.note) : ""}</span>`
+              )
+              .join("")
+          : '<span class="h-empty">Noch keine Einheit eingetragen.</span>';
+
+        card.innerHTML = `
+          <div class="skill-head">
+            <div>
+              <div class="skill-name">🎯 ${escapeHtml(skill.name)}</div>
+              <div style="margin-top:4px"><span class="badge area">${areaInfo.icon} ${areaInfo.label}</span></div>
+              ${skill.direction ? `<div class="skill-dir">${escapeHtml(skill.direction)}</div>` : ""}
+            </div>
+            <button class="icon-btn del sk-del" title="Skill löschen">🗑️</button>
+          </div>
+
+          <div class="level-row">
+            <span class="level-badge">LVL ${level}</span>
+            <div class="xp">
+              <div class="xp-label">
+                <span>${xp} XP gesamt</span>
+                <span>${intoLevel} / 100 bis LVL ${level + 1}</span>
+              </div>
+              <div class="bar"><div class="fill" style="width:${intoLevel}%"></div></div>
+            </div>
+          </div>
+
+          <ul class="ms-list">${msHtml}</ul>
+          <div class="ms-add">
+            <input type="text" class="ms-add-input" placeholder="Neuen Meilenstein hinzufügen ..." />
+            <button class="ms-add-btn">+ Meilenstein</button>
+          </div>
+
+          <div class="skill-actions">
+            <input type="text" class="unit-note-input" placeholder="Notiz zur Einheit (optional)" />
+            <button class="unit-btn">🏋️ Übungseinheit eintragen</button>
+            <span class="unit-count">${skill.log.length} Einheit${skill.log.length === 1 ? "" : "en"} · +5 XP je Einheit</span>
+          </div>
+
+          <div class="history">
+            <div class="h-title">Letzte Einheiten</div>
+            ${histHtml}
+          </div>
+        `;
+
+        // Übungseinheit eintragen (liest das optionale Notizfeld der Karte).
+        const noteInput = card.querySelector(".unit-note-input");
+        card.querySelector(".unit-btn").addEventListener("click", () => {
+          addUnit(skill.id, noteInput.value);
+        });
+        card.querySelector(".sk-del").addEventListener("click", () => deleteSkill(skill.id));
+
+        card.querySelectorAll(".ms-item").forEach((li) => {
+          const msId = li.dataset.ms;
+          li.querySelector(".ms-check").addEventListener("click", () => toggleMilestone(skill.id, msId));
+          li.querySelector(".ms-del").addEventListener("click", () => deleteMilestone(skill.id, msId));
+        });
+
+        const addInput = card.querySelector(".ms-add-input");
+        const addBtn = card.querySelector(".ms-add-btn");
+        const doAdd = () => addMilestone(skill.id, addInput.value);
+        addBtn.addEventListener("click", doAdd);
+        addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+
+        return card;
+      }
+
+      // Übungseinheit eintragen: Objekt { date, note } ans Log hängen (+5 XP).
+      function addUnit(skillId, note) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        skill.log.push({ id: makeId(), date: new Date().toISOString(), note: (note || "").trim() });
+        saveSkills();
+        renderSkills();
+      }
+
+      function toggleMilestone(skillId, msId) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        const ms = skill.milestones.find((m) => m.id === msId);
+        if (!ms) return;
+        ms.done = !ms.done;
+        saveSkills();
+        renderSkills();
+      }
+
+      function addMilestone(skillId, title) {
+        const clean = (title || "").trim();
+        if (!clean) return;
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        skill.milestones.push({ id: makeId(), title: clean, done: false });
+        saveSkills();
+        renderSkills();
+      }
+
+      function deleteMilestone(skillId, msId) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        skill.milestones = skill.milestones.filter((m) => m.id !== msId);
+        saveSkills();
+        renderSkills();
+      }
+
+      function deleteSkill(skillId) {
+        const skill = skills.find((s) => s.id === skillId);
+        if (!skill) return;
+        if (!confirm(`Skill „${skill.name}" wirklich löschen?`)) return;
+        skills = skills.filter((s) => s.id !== skillId);
+        saveSkills();
+        renderSkills();
+      }
+
+      /* ---- Skill-Formular ------------------------------------------------ */
+      function showSkillForm() {
+        document.getElementById("sk-form-panel").classList.remove("hidden");
+        document.getElementById("sk-name").focus();
+      }
+      function hideSkillForm() {
+        document.getElementById("sk-form-panel").classList.add("hidden");
+        resetSkillForm();
+      }
+      function resetSkillForm() {
+        document.getElementById("sk-name").value = "";
+        document.getElementById("sk-area").value = DEFAULT_AREA;
+        document.getElementById("sk-direction").value = "";
+        document.querySelectorAll(".sk-ms-input").forEach((inp) => (inp.value = ""));
+      }
+      function saveSkillForm() {
+        const name = document.getElementById("sk-name").value.trim();
+        const area = document.getElementById("sk-area").value;
+        const direction = document.getElementById("sk-direction").value.trim();
+
+        if (!name) {
+          alert("Bitte gib einen Namen für den Skill ein.");
+          return;
+        }
+
+        const milestones = [];
+        document.querySelectorAll(".sk-ms-input").forEach((inp) => {
+          const t = inp.value.trim();
+          if (t) milestones.push({ id: makeId(), title: t, done: false });
+        });
+
+        skills.push({
+          id: makeId(),
+          name: name,
+          area: area,          // Pflichtfeld
+          direction: direction,
+          milestones: milestones,
+          log: [],
+        });
+
+        saveSkills();
+        hideSkillForm();
+        renderSkills();
+      }
+
+      document.getElementById("sk-new-btn").addEventListener("click", showSkillForm);
+      document.getElementById("sk-save").addEventListener("click", saveSkillForm);
+      document.getElementById("sk-cancel").addEventListener("click", hideSkillForm);
+
+      /* ====================================================================
+         SCHNELLEINGABE (Parser + Vorschau)
+         --------------------------------------------------------------------
+         Regeln:
+           - Zeile ohne Einrückung         = neue Aufgabe
+           - Zeile eingerückt ODER mit -,*,> = Unterpunkt der Aufgabe darüber
+           - Leere Zeilen werden ignoriert
+           - @arbeit / @privat / @ziel setzt die Kategorie (@alltag = Alias für @privat)
+           - !05.11.2026 oder !2026-11-05 setzt die Deadline
+           - Diese Marker werden aus dem Titel entfernt
+         ==================================================================== */
+
+      // Wandelt "05.11.2026" -> "2026-11-05"; ISO-Datum bleibt unverändert.
+      function normalizeDate(s) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (m) {
+          const day = m[1].padStart(2, "0");
+          const mon = m[2].padStart(2, "0");
+          return `${m[3]}-${mon}-${day}`;
+        }
+        return null;
+      }
+
+      // Zieht Kategorie- und Deadline-Marker aus einem Text und entfernt sie.
+      function extractMarkers(text) {
+        let title = text;
+        let category = null;
+        let deadline = null;
+
+        const catMatch = title.match(/@(arbeit|alltag|privat|ziel)\b/i);
+        if (catMatch) {
+          category = catMatch[1].toLowerCase();
+          if (category === "alltag") category = "privat"; // Alias: Alltag -> Privat
+          title = title.replace(catMatch[0], "");
+        }
+
+        const dlMatch = title.match(/!(\d{1,2}\.\d{1,2}\.\d{4}|\d{4}-\d{2}-\d{2})/);
+        if (dlMatch) {
+          deadline = normalizeDate(dlMatch[1]);
+          title = title.replace(dlMatch[0], "");
+        }
+
+        title = title.replace(/\s+/g, " ").trim();
+        return { title, category, deadline };
+      }
+
+      // Zerlegt den gesamten Eingabetext in Aufgaben (mit Unterpunkten).
+      function parseQuickInput(text) {
+        const lines = text.split(/\r?\n/);
+        const tasks = [];
+        let current = null;
+
+        for (const raw of lines) {
+          if (raw.trim() === "") continue; // leere Zeilen ignorieren
+
+          const hasIndent = /^\s+/.test(raw);              // beginnt mit Leerzeichen/Tab
+          const bulletMatch = raw.match(/^\s*[-*>]\s?(.*)$/); // beginnt mit - , * oder >
+          const isSub = hasIndent || !!bulletMatch;
+
+          // Reinen Inhalt bestimmen (Aufzählungszeichen entfernen).
+          let content = bulletMatch ? bulletMatch[1] : raw;
+          const parsed = extractMarkers(content.trim());
+
+          if (parsed.title === "") continue; // nach Marker-Entfernung nichts übrig
+
+          if (isSub && current) {
+            // Unterpunkt der aktuellen Aufgabe.
+            current.subtasks.push({ title: parsed.title, done: false });
+          } else {
+            // Neue Aufgabe.
+            current = {
+              title: parsed.title,
+              category: parsed.category || "privat", // Default, wenn kein Marker
+              deadline: parsed.deadline || null,
+              subtasks: [],
+              include: true, // in der Vorschau standardmäßig ausgewählt
+            };
+            tasks.push(current);
+          }
+        }
+        return tasks;
+      }
+
+      /* ---- Claude-API-Aufruf (die EINE Funktion, später serverseitig ersetzbar) ----
+         Diese Funktion kapselt den kompletten Netzwerk-Aufruf. Wer die Analyse
+         später auf einen Server verschieben will, ersetzt NUR den Inhalt dieser
+         Funktion (z. B. fetch gegen das eigene Backend). Der Rest der App – Vorschau,
+         Speichern, Fallback – bleibt unverändert.
+         Rückgabe: { tasks: [...], habits: [...] }  oder wirft einen Fehler. */
+      async function aiExtractStructured(freeText, todayStr) {
+        const apiKey = getApiKey();
+        if (!apiKey) throw new Error("Kein API-Key hinterlegt.");
+
+        const MODEL = "claude-haiku-4-5-20251001"; // günstiges, schnelles Modell für die Textzerlegung
+
+        // System-Prompt: beschreibt exakt das gewünschte JSON und die Kategorien.
+        const system =
+          "Du wandelst deutschen Fließtext in strukturierte To-dos und Habits um. " +
+          "Antworte AUSSCHLIESSLICH mit einem JSON-Objekt – kein Fließtext, keine Code-Fences. " +
+          'Schema: {"tasks":[{"title":string,"category":"arbeit"|"privat"|"ziel",' +
+          '"deadline":"YYYY-MM-DD"|null,"note":string,"subtasks":[{"title":string}]}],' +
+          '"habits":[{"name":string,"frequency":"daily"|"weekly","timesPerWeek":number|null}]}. ' +
+          "TITEL-REGELN: Übernimm Titel NICHT wörtlich. Formuliere sie zu kurzen, prägnanten Stichpunkten um – " +
+          "kurz und handlungsorientiert, idealerweise 2–5 Wörter. Füllwörter und Satzbau raus " +
+          "('Ich muss noch…', 'und dann sollte ich…'). Verb voranstellen, wo es passt. " +
+          "Beispiele: 'Ich muss der Erna noch eine E-Mail schreiben wegen dem Schaden' -> 'Erna: E-Mail wegen Schaden'; " +
+          "'Dann sollte ich eigentlich mal beim Steuerberater nachhaken ob die Belege angekommen sind' -> 'Steuerberater: Belegeingang prüfen'. " +
+          "Details, die nicht in den knappen Titel passen (Kontext, Begründung, Zusatzinfos), kommen ins Feld note – " +
+          "nichts verlieren, nur verdichten. Ist nichts übrig, setze note auf einen leeren String. " +
+          "Einmalige Vorhaben sind tasks. Wiederkehrende Aktivitäten (z. B. 'dreimal pro Woche laufen') " +
+          "sind habits mit frequency 'weekly' und timesPerWeek=3 bzw. frequency 'daily' und timesPerWeek null. " +
+          "Löse relative Datumsangaben wie 'Freitag' oder 'in drei Tagen' anhand des mitgegebenen heutigen Datums auf. " +
+          "Kategorie bestmöglich einschätzen: beruflich=arbeit, Alltag/Haushalt/Persönliches=privat, " +
+          "langfristige Ziele=ziel. Teilschritte eines Vorhabens kommen in subtasks.";
+
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            // Erlaubt den Direktaufruf aus dem Browser (nur für lokale Nutzung!).
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: 2000,
+            system: system,
+            messages: [
+              { role: "user", content: `Heutiges Datum: ${todayStr}\n\nText:\n${freeText}` },
+            ],
+          }),
+        });
+
+        if (!res.ok) {
+          const detail = await res.text().catch(() => "");
+          throw new Error("API-Fehler " + res.status + (detail ? ": " + detail : ""));
+        }
+
+        const data = await res.json();
+        // Die Antwort ist ein Array aus Blöcken; wir brauchen den Text-Block
+        // (bei aktiviertem Thinking können weitere Blöcke davor stehen).
+        const textBlock = (data.content || []).find((b) => b.type === "text");
+        const rawText = textBlock ? textBlock.text : "";
+        return normalizeAiResult(extractJsonObject(rawText));
+      }
+
+      // Holt ein JSON-Objekt robust aus dem Antworttext (mit/ohne Code-Fences).
+      function extractJsonObject(text) {
+        if (!text) throw new Error("Leere Antwort vom Modell.");
+        try { return JSON.parse(text); } catch (e) {}
+        const t = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try { return JSON.parse(t); } catch (e) {}
+        const first = t.indexOf("{");
+        const last = t.lastIndexOf("}");
+        if (first >= 0 && last > first) return JSON.parse(t.slice(first, last + 1));
+        throw new Error("Antwort war kein gültiges JSON.");
+      }
+
+      // Bringt das KI-Ergebnis auf unsere interne Struktur (mit Defaults + Validierung).
+      function normalizeAiResult(obj) {
+        const cats = ["arbeit", "privat", "ziel"];
+        const rawTasks = Array.isArray(obj.tasks) ? obj.tasks : [];
+        const rawHabits = Array.isArray(obj.habits) ? obj.habits : [];
+        return {
+          tasks: rawTasks
+            .map((t) => ({
+              title: String(t.title || "").trim(),
+              category: cats.includes(t.category) ? t.category : "privat",
+              deadline: /^\d{4}-\d{2}-\d{2}$/.test(t.deadline || "") ? t.deadline : null,
+              note: String(t.note || "").trim(),
+              subtasks: Array.isArray(t.subtasks)
+                ? t.subtasks
+                    .map((s) => ({ title: String((s && s.title) || s || "").trim(), done: false }))
+                    .filter((s) => s.title)
+                : [],
+              include: true,
+            }))
+            .filter((t) => t.title),
+          habits: rawHabits
+            .map((h) => ({
+              name: String(h.name || "").trim(),
+              frequency: h.frequency === "weekly" ? "weekly" : "daily",
+              timesPerWeek: h.frequency === "weekly" ? (parseInt(h.timesPerWeek, 10) || 1) : null,
+              include: true,
+            }))
+            .filter((h) => h.name),
+        };
+      }
+
+      /* ---- Vorschau zeichnen (Aufgaben + Habits + Quelle-Banner) ---------- */
+      function renderQuickPreview() {
+        const box = document.getElementById("q-preview-list");
+        const flag = document.getElementById("q-source");
+        box.innerHTML = "";
+
+        // Sichtbar machen, woher das Ergebnis kommt.
+        flag.innerHTML =
+          quickSource === "ai"
+            ? '<div class="notice info2"><span>🤖 Erkannt per Claude API (freier Fließtext).</span></div>'
+            : '<div class="notice warn"><span>⚙️ Regelbasierter Parser aktiv (kein API-Key oder API-Fehler). ' +
+              "Es gelten die Marker @arbeit/@privat/@ziel und !YYYY-MM-DD.</span></div>";
+
+        if (quickTasks.length === 0 && quickHabits.length === 0) {
+          box.innerHTML = '<div class="empty">Nichts erkannt.</div>';
+          return;
+        }
+
+        if (quickTasks.length) {
+          const h = document.createElement("div");
+          h.className = "block-sub";
+          h.textContent = "Aufgaben";
+          box.appendChild(h);
+          quickTasks.forEach((task) => box.appendChild(buildQuickTaskRow(task)));
+        }
+
+        if (quickHabits.length) {
+          const h = document.createElement("div");
+          h.className = "block-sub";
+          h.textContent = "Habits";
+          box.appendChild(h);
+          quickHabits.forEach((hab) => box.appendChild(buildQuickHabitRow(hab)));
+        }
+      }
+
+      // Eine Aufgaben-Vorschauzeile (Checkbox zum Abwählen, Titel editierbar).
+      function buildQuickTaskRow(task) {
+        const catInfo = CATEGORY_INFO[task.category] || { label: task.category, icon: "•" };
+        const deadlineBadge = task.deadline
+          ? `<span class="badge">📅 ${formatDate(task.deadline)}</span>`
+          : "";
+        const subHtml = task.subtasks.length
+          ? `<ul class="q-sub-list">${task.subtasks
+              .map((s) => `<li>${escapeHtml(s.title)}</li>`)
+              .join("")}</ul>`
+          : "";
+
+        // Verdichtete Zusatz-Infos landen in der Notiz (nur zur Anzeige hier).
+        const noteHtml = task.note ? `<div class="q-note">📝 ${escapeHtml(task.note)}</div>` : "";
+
+        const row = document.createElement("div");
+        row.className = "q-task" + (task.include ? "" : " excluded");
+        row.innerHTML = `
+          <input type="checkbox" class="q-include" ${task.include ? "checked" : ""} />
+          <div class="q-task-body">
+            <input type="text" class="q-title-input" value="${escapeHtml(task.title)}" />
+            <div class="q-meta">
+              <span class="badge cat-${task.category}">${catInfo.icon} ${catInfo.label}</span>
+              ${deadlineBadge}
+            </div>
+            ${noteHtml}
+            ${subHtml}
+          </div>
+        `;
+        const cb = row.querySelector(".q-include");
+        cb.addEventListener("change", () => {
+          task.include = cb.checked;
+          row.classList.toggle("excluded", !cb.checked);
+        });
+        const ti = row.querySelector(".q-title-input");
+        ti.addEventListener("input", () => { task.title = ti.value; });
+        return row;
+      }
+
+      // Eine Habit-Vorschauzeile (Checkbox zum Abwählen, Name editierbar).
+      function buildQuickHabitRow(hab) {
+        const freq = hab.frequency === "weekly" ? (hab.timesPerWeek || 1) + "× pro Woche" : "Täglich";
+        const row = document.createElement("div");
+        row.className = "q-task" + (hab.include ? "" : " excluded");
+        row.innerHTML = `
+          <input type="checkbox" class="q-include" ${hab.include ? "checked" : ""} />
+          <div class="q-task-body">
+            <input type="text" class="q-title-input" value="${escapeHtml(hab.name)}" />
+            <div class="q-meta"><span class="badge">🔁 ${freq}</span></div>
+          </div>
+        `;
+        const cb = row.querySelector(".q-include");
+        cb.addEventListener("change", () => {
+          hab.include = cb.checked;
+          row.classList.toggle("excluded", !cb.checked);
+        });
+        const ti = row.querySelector(".q-title-input");
+        ti.addEventListener("input", () => { hab.name = ti.value; });
+        return row;
+      }
+
+      // "Vorschau"-Knopf: bevorzugt Claude API, sonst Fallback-Parser.
+      async function previewQuick() {
+        const text = document.getElementById("q-input").value.trim();
+        if (!text) { alert("Bitte zuerst Text eingeben."); return; }
+
+        if (getApiKey()) {
+          // KI-Pfad (mit Ladezustand am Knopf).
+          const btn = document.getElementById("q-preview-btn");
+          btn.disabled = true;
+          btn.textContent = "⏳ Analysiere ...";
+          try {
+            const result = await aiExtractStructured(text, todayISO());
+            quickTasks = result.tasks;
+            quickHabits = result.habits;
+            quickSource = "ai";
+          } catch (err) {
+            // Fehler -> sichtbar auf den regelbasierten Parser zurückfallen.
+            console.warn("KI-Analyse fehlgeschlagen, nutze Fallback:", err);
+            quickTasks = parseQuickInput(text);
+            quickHabits = [];
+            quickSource = "rule";
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "👁️ Vorschau";
+          }
+        } else {
+          // Kein Key -> direkt regelbasiert.
+          quickTasks = parseQuickInput(text);
+          quickHabits = [];
+          quickSource = "rule";
+        }
+
+        renderQuickPreview();
+        document.getElementById("q-preview-panel").classList.remove("hidden");
+      }
+
+      // "Übernehmen": ausgewählte Aufgaben + Habits speichern.
+      function applyQuick() {
+        const tasks = quickTasks.filter((t) => t.include && t.title.trim() !== "");
+        const habs = quickHabits.filter((h) => h.include && h.name.trim() !== "");
+        if (tasks.length === 0 && habs.length === 0) {
+          alert("Nichts ausgewählt.");
+          return;
+        }
+
+        tasks.forEach((t) => {
+          entries.push({
+            id: makeId(),
+            title: t.title.trim(),
+            category: t.category,
+            deadline: t.deadline,
+            status: "offen",
+            createdAt: new Date().toISOString(),
+            note: t.note || "", // verdichtete Details aus der Schnelleingabe
+            subtasks: t.subtasks.map((s) => ({ title: s.title, done: false })),
+          });
+        });
+
+        habs.forEach((h) => {
+          habits.push({
+            id: makeId(),
+            name: h.name.trim(),
+            frequency: h.frequency,
+            timesPerWeek: h.frequency === "weekly" ? (h.timesPerWeek || 1) : null,
+            skillId: null, // Verknüpfung kann der Nutzer später in der Habits-Ansicht setzen
+            completions: [],
+          });
+        });
+
+        saveEntries();
+        saveHabits();
+        clearQuick();
+        render();
+        switchView("all");
+      }
+
+      // Setzt die Schnelleingabe zurück (Text + Vorschau + Quelle).
+      function clearQuick() {
+        document.getElementById("q-input").value = "";
+        quickTasks = [];
+        quickHabits = [];
+        quickSource = "rule";
+        document.getElementById("q-preview-list").innerHTML = "";
+        document.getElementById("q-source").innerHTML = "";
+        document.getElementById("q-preview-panel").classList.add("hidden");
+      }
+
+      // Beispiel-Platzhaltertext: zeigt, dass freier Fließtext reicht.
+      document.getElementById("q-input").placeholder =
+        "Ich muss Kunde Meier die Unterlagen schicken, bis Freitag, und danach in drei " +
+        "Tagen nachhaken ob angekommen. Außerdem will ich diese Woche dreimal laufen.";
+
+      document.getElementById("q-preview-btn").addEventListener("click", previewQuick);
+      document.getElementById("q-clear-btn").addEventListener("click", clearQuick);
+      document.getElementById("q-apply-btn").addEventListener("click", applyQuick);
+      document.getElementById("q-back-btn").addEventListener("click", () => {
+        document.getElementById("q-preview-panel").classList.add("hidden");
+      });
+
+      /* ====================================================================
+         EINSTELLUNGEN (API-Key in localStorage)
+         ==================================================================== */
+
+      // Lädt die Einstellungen (robust gegen fehlende/kaputte Daten).
+      function loadSettings() {
+        try {
+          const raw = localStorage.getItem(SETTINGS_KEY);
+          if (!raw) return { apiKey: "" };
+          const d = JSON.parse(raw);
+          return d && typeof d === "object" ? { apiKey: d.apiKey || "" } : { apiKey: "" };
+        } catch (err) {
+          console.warn("Konnte Einstellungen nicht laden:", err);
+          return { apiKey: "" };
+        }
+      }
+      function saveSettings() {
+        try {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        } catch (err) {
+          console.warn("Konnte Einstellungen nicht speichern:", err);
+        }
+      }
+      // Einzige Stelle, an der der Key gelesen wird.
+      function getApiKey() {
+        return (settings.apiKey || "").trim();
+      }
+
+      // Zeigt (maskiert) an, ob ein Key gespeichert ist.
+      function renderSettingsStatus() {
+        const el = document.getElementById("set-status");
+        const key = getApiKey();
+        el.textContent = key
+          ? "Aktuell gespeichert: " + key.slice(0, 10) + "… (" + key.length + " Zeichen)"
+          : "Kein API-Key gespeichert.";
+      }
+
+      document.getElementById("set-save").addEventListener("click", () => {
+        settings.apiKey = document.getElementById("set-apikey").value.trim();
+        saveSettings();
+        renderSettingsStatus();
+        alert("API-Key gespeichert (nur in diesem Browser).");
+      });
+      document.getElementById("set-clear").addEventListener("click", () => {
+        settings.apiKey = "";
+        document.getElementById("set-apikey").value = "";
+        saveSettings();
+        renderSettingsStatus();
+      });
+
+      /* ====================================================================
+         HABITS (wiederkehrende Aktivitäten, optional an einen Skill gekoppelt)
+         ==================================================================== */
+
+      // Laden + Migrieren der Habit-Liste.
+      function loadHabits() {
+        try {
+          const raw = localStorage.getItem(HABITS_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          if (!Array.isArray(data)) return [];
+          return data.map(migrateHabit);
+        } catch (err) {
+          console.warn("Konnte Habits nicht laden:", err);
+          return [];
+        }
+      }
+
+      // Stellt sicher, dass ältere/kaputte Habit-Daten alle Felder haben.
+      function migrateHabit(h) {
+        const copy = Object.assign({}, h);
+        if (copy.frequency !== "weekly") copy.frequency = copy.frequency || "daily";
+        if (!Array.isArray(copy.completions)) copy.completions = [];
+        if (copy.skillId === undefined) copy.skillId = null;
+        if (copy.timesPerWeek === undefined) copy.timesPerWeek = null;
+        return copy;
+      }
+
+      function saveHabits() {
+        try {
+          localStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+        } catch (err) {
+          console.warn("Konnte Habits nicht speichern:", err);
+        }
+      }
+
+      /* ---- Datums-/Status-Hilfen für Habits ------------------------------ */
+
+      // Ist der Habit heute schon erledigt?
+      function isHabitDoneToday(habit) {
+        const today = todayISO();
+        return habit.completions.some((c) => c.date === today);
+      }
+
+      // Montag der aktuellen Woche als "YYYY-MM-DD" (für Wochen-Habits).
+      function startOfWeekISO() {
+        const d = new Date();
+        const dayMoFirst = (d.getDay() + 6) % 7; // Mo=0 ... So=6
+        d.setDate(d.getDate() - dayMoFirst);
+        return isoFromDate(d);
+      }
+
+      // Wie oft wurde der Habit diese Woche erledigt?
+      function weeklyCount(habit) {
+        const start = startOfWeekISO();
+        return habit.completions.filter((c) => c.date >= start).length;
+      }
+
+      // Ist der Habit heute fällig (und noch offen)?
+      function isHabitDueToday(habit) {
+        if (isHabitDoneToday(habit)) return false; // heute erledigt -> nicht mehr fällig
+        if (habit.frequency === "daily") return true;
+        const target = habit.timesPerWeek || 1;
+        return weeklyCount(habit) < target; // Wochenziel noch nicht erreicht
+      }
+
+      // Tägliche Streak: wie viele Tage in Folge (bis heute/gestern) erledigt.
+      function dailyStreak(habit) {
+        const dates = new Set(habit.completions.map((c) => c.date));
+        const d = new Date();
+        // Ist heute noch offen, zählen wir ab gestern (der Streak ist noch intakt).
+        if (!dates.has(todayISO())) d.setDate(d.getDate() - 1);
+        let streak = 0;
+        while (dates.has(isoFromDate(d))) {
+          streak++;
+          d.setDate(d.getDate() - 1);
+        }
+        return streak;
+      }
+
+      /* ---- Anzeige ------------------------------------------------------- */
+
+      function renderHabits() {
+        const list = document.getElementById("hb-list");
+        list.innerHTML = "";
+        if (habits.length === 0) {
+          list.innerHTML =
+            '<div class="panel"><div class="empty">Noch keine Habits. Klicke oben auf „Neuer Habit".</div></div>';
+          return;
+        }
+        habits.forEach((habit) => list.appendChild(buildHabitCard(habit)));
+      }
+
+      // Kleiner Text für die Frequenz.
+      function frequencyLabel(habit) {
+        return habit.frequency === "daily"
+          ? "Täglich"
+          : (habit.timesPerWeek || 1) + "× pro Woche";
+      }
+
+      // Baut das Monatsraster (aktueller Monat) für einen Habit als HTML-Text.
+      // Erledigte Tage werden farbig, der heutige Tag wird umrandet.
+      function monthGridHtml(habit) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0 = Januar
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        // Wochentag des Monatsersten, Montag-zuerst (Mo=0 ... So=6).
+        const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+
+        // Alle erledigten Tage dieses Habits als schnelles Nachschlage-Set.
+        const doneSet = new Set(habit.completions.map((c) => c.date));
+        const todayStr = todayISO();
+
+        // Kopfzeile mit Wochentagen.
+        const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+        let cells = weekdays.map((w) => `<div class="mg-weekday">${w}</div>`).join("");
+
+        // Leer-Kästchen, damit Tag 1 unter dem richtigen Wochentag startet.
+        for (let i = 0; i < offset; i++) cells += `<div class="mg-cell blank"></div>`;
+
+        // Ein Kästchen pro Tag des Monats.
+        for (let day = 1; day <= daysInMonth; day++) {
+          const iso = isoFromDate(new Date(year, month, day));
+          const classes = ["mg-cell"];
+          if (doneSet.has(iso)) classes.push("done");   // erledigt -> farbig
+          if (iso === todayStr) classes.push("today");  // heute -> umrandet
+          cells += `<div class="${classes.join(" ")}" title="${iso}">${day}</div>`;
+        }
+
+        const monthName = now.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+        return `
+          <div class="month-grid">
+            <div class="mg-title">Monatsübersicht · ${monthName}</div>
+            <div class="mg-cells">${cells}</div>
+          </div>`;
+      }
+
+      // Karte für EINEN Habit (in der Habits-Ansicht).
+      function buildHabitCard(habit) {
+        const done = isHabitDoneToday(habit);
+        const skill = habit.skillId ? skills.find((s) => s.id === habit.skillId) : null;
+
+        // Fortschrittszeile: Streak (täglich) oder Wochenzähler (wöchentlich).
+        let progressHtml;
+        if (habit.frequency === "daily") {
+          progressHtml = `🔥 Streak: <strong>${dailyStreak(habit)}</strong> Tag(e)`;
+        } else {
+          const target = habit.timesPerWeek || 1;
+          progressHtml = `📅 Diese Woche: <strong>${weeklyCount(habit)}/${target}</strong>`;
+        }
+
+        const card = document.createElement("div");
+        card.className = "habit-card" + (done ? " done-today" : "");
+        card.innerHTML = `
+          <div class="skill-head">
+            <div>
+              <div class="skill-name">🔁 ${escapeHtml(habit.name)}</div>
+              <div style="margin-top:4px">
+                <span class="badge">${frequencyLabel(habit)}</span>
+                ${
+                  skill
+                    ? `<span class="badge area">🎯 ${escapeHtml(skill.name)}</span>`
+                    : `<span class="badge">kein Skill</span>`
+                }
+              </div>
+            </div>
+            <button class="icon-btn del hb-del" title="Habit löschen">🗑️</button>
+          </div>
+
+          <div class="habit-progress">${progressHtml}</div>
+
+          <div class="skill-actions">
+            <button class="unit-btn hb-toggle">${done ? "✓ Heute erledigt — rückgängig" : "Heute abhaken"}</button>
+            ${habit.skillId ? `<span class="unit-count">Abhaken zahlt +5 XP in den Skill ein</span>` : ""}
+          </div>
+
+          ${monthGridHtml(habit)}
+        `;
+
+        card.querySelector(".hb-toggle").addEventListener("click", () => toggleHabitToday(habit.id));
+        card.querySelector(".hb-del").addEventListener("click", () => deleteHabit(habit.id));
+        return card;
+      }
+
+      /* ---- Aktionen ------------------------------------------------------ */
+
+      // Habit für HEUTE abhaken bzw. wieder rückgängig machen.
+      // Die Skill-Kopplung passiert genau hier.
+      function toggleHabitToday(habitId) {
+        const habit = habits.find((h) => h.id === habitId);
+        if (!habit) return;
+
+        const today = todayISO();
+        const idx = habit.completions.findIndex((c) => c.date === today);
+
+        if (idx >= 0) {
+          // ----- Rückgängig: Completion entfernen -----
+          const comp = habit.completions[idx];
+          // Gab es einen gekoppelten Skill-Log-Eintrag? Dann mitlöschen.
+          if (comp.logId && habit.skillId) {
+            const skill = skills.find((s) => s.id === habit.skillId);
+            if (skill) skill.log = skill.log.filter((e) => e.id !== comp.logId);
+          }
+          habit.completions.splice(idx, 1);
+        } else {
+          // ----- Abhaken: Completion hinzufügen -----
+          let logId = null;
+          // Mit Skill gekoppelt? Dann automatisch eine Übungseinheit eintragen.
+          if (habit.skillId) {
+            const skill = skills.find((s) => s.id === habit.skillId);
+            if (skill) {
+              logId = makeId();
+              skill.log.push({
+                id: logId,
+                date: new Date().toISOString(),
+                note: "Habit: " + habit.name,
+              });
+            }
+          }
+          habit.completions.push({ date: today, logId: logId });
+        }
+
+        saveHabits();
+        saveSkills(); // XP/Level des Skills haben sich evtl. geändert
+        render();     // Dashboard, Skills und Habits neu zeichnen
+      }
+
+      function deleteHabit(habitId) {
+        const habit = habits.find((h) => h.id === habitId);
+        if (!habit) return;
+        if (!confirm(`Habit „${habit.name}" wirklich löschen?`)) return;
+        // Hinweis: bereits eingetragene Skill-XP bleiben erhalten (die Einheiten
+        // haben ja stattgefunden). Nur der Habit selbst verschwindet.
+        habits = habits.filter((h) => h.id !== habitId);
+        saveHabits();
+        renderHabits();
+        renderDashboard();
+      }
+
+      /* ---- Habit-Formular ------------------------------------------------ */
+
+      // Füllt das Skill-Dropdown im Habit-Formular mit den aktuellen Skills.
+      function populateHabitSkillSelect() {
+        const sel = document.getElementById("hb-skill");
+        sel.innerHTML = '<option value="">— kein Skill —</option>';
+        skills.forEach((s) => {
+          const opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.name;
+          sel.appendChild(opt);
+        });
+      }
+
+      function showHabitForm() {
+        populateHabitSkillSelect();
+        document.getElementById("hb-form-panel").classList.remove("hidden");
+        document.getElementById("hb-name").focus();
+      }
+      function hideHabitForm() {
+        document.getElementById("hb-form-panel").classList.add("hidden");
+        resetHabitForm();
+      }
+      function resetHabitForm() {
+        document.getElementById("hb-name").value = "";
+        document.getElementById("hb-frequency").value = "daily";
+        document.getElementById("hb-perweek").value = "3";
+        document.getElementById("hb-perweek-field").classList.add("hidden");
+        document.getElementById("hb-skill").value = "";
+      }
+      function saveHabitForm() {
+        const name = document.getElementById("hb-name").value.trim();
+        const frequency = document.getElementById("hb-frequency").value;
+        const skillId = document.getElementById("hb-skill").value || null;
+
+        if (!name) {
+          alert("Bitte gib einen Namen für den Habit ein.");
+          return;
+        }
+
+        // Wochenziel nur bei "weekly" erfassen (1–7).
+        let timesPerWeek = null;
+        if (frequency === "weekly") {
+          const n = parseInt(document.getElementById("hb-perweek").value, 10);
+          timesPerWeek = Math.min(7, Math.max(1, isNaN(n) ? 1 : n));
+        }
+
+        habits.push({
+          id: makeId(),
+          name: name,
+          frequency: frequency,
+          timesPerWeek: timesPerWeek,
+          skillId: skillId,
+          completions: [],
+        });
+
+        saveHabits();
+        hideHabitForm();
+        renderHabits();
+      }
+
+      // Formular-Knöpfe + Logik verbinden.
+      document.getElementById("hb-new-btn").addEventListener("click", showHabitForm);
+      document.getElementById("hb-save").addEventListener("click", saveHabitForm);
+      document.getElementById("hb-cancel").addEventListener("click", hideHabitForm);
+      // Das Feld "Mal pro Woche" nur bei "X-mal pro Woche" zeigen.
+      document.getElementById("hb-frequency").addEventListener("change", (e) => {
+        document
+          .getElementById("hb-perweek-field")
+          .classList.toggle("hidden", e.target.value !== "weekly");
+      });
+
+      /* --------------------------------------------------------------------
+         D) START: Migrationen sichern + erste Anzeige aufbauen
+         -------------------------------------------------------------------- */
+      // Beim Laden ggf. migrierte Daten einmal zurückschreiben, damit die
+      // Bereinigung (z. B. entferntes skillData) dauerhaft gespeichert ist.
+      saveEntries();
+      saveSkills();
+      saveHabits();
+
+      render();
+      renderMigrationNotice();
+    </script>
+  </body>
+</html>

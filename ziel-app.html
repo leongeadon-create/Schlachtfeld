@@ -381,6 +381,7 @@
       .q-sub-list { list-style: none; margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
       .q-sub-list li { font-size: 0.85rem; color: var(--text-dim); }
       .q-sub-list li::before { content: "↳ "; color: var(--accent); }
+      .q-note { color: var(--text-dim); font-size: 0.82rem; margin-top: 6px; white-space: pre-wrap; }
 
       /* ====================================================================
          8) HABITS
@@ -1650,8 +1651,15 @@
           "Du wandelst deutschen Fließtext in strukturierte To-dos und Habits um. " +
           "Antworte AUSSCHLIESSLICH mit einem JSON-Objekt – kein Fließtext, keine Code-Fences. " +
           'Schema: {"tasks":[{"title":string,"category":"arbeit"|"alltag"|"privat"|"ziel",' +
-          '"deadline":"YYYY-MM-DD"|null,"subtasks":[{"title":string}]}],' +
+          '"deadline":"YYYY-MM-DD"|null,"note":string,"subtasks":[{"title":string}]}],' +
           '"habits":[{"name":string,"frequency":"daily"|"weekly","timesPerWeek":number|null}]}. ' +
+          "TITEL-REGELN: Übernimm Titel NICHT wörtlich. Formuliere sie zu kurzen, prägnanten Stichpunkten um – " +
+          "kurz und handlungsorientiert, idealerweise 2–5 Wörter. Füllwörter und Satzbau raus " +
+          "('Ich muss noch…', 'und dann sollte ich…'). Verb voranstellen, wo es passt. " +
+          "Beispiele: 'Ich muss der Erna noch eine E-Mail schreiben wegen dem Schaden' -> 'Erna: E-Mail wegen Schaden'; " +
+          "'Dann sollte ich eigentlich mal beim Steuerberater nachhaken ob die Belege angekommen sind' -> 'Steuerberater: Belegeingang prüfen'. " +
+          "Details, die nicht in den knappen Titel passen (Kontext, Begründung, Zusatzinfos), kommen ins Feld note – " +
+          "nichts verlieren, nur verdichten. Ist nichts übrig, setze note auf einen leeren String. " +
           "Einmalige Vorhaben sind tasks. Wiederkehrende Aktivitäten (z. B. 'dreimal pro Woche laufen') " +
           "sind habits mit frequency 'weekly' und timesPerWeek=3 bzw. frequency 'daily' und timesPerWeek null. " +
           "Löse relative Datumsangaben wie 'Freitag' oder 'in drei Tagen' anhand des mitgegebenen heutigen Datums auf. " +
@@ -1713,6 +1721,7 @@
               title: String(t.title || "").trim(),
               category: cats.includes(t.category) ? t.category : "alltag",
               deadline: /^\d{4}-\d{2}-\d{2}$/.test(t.deadline || "") ? t.deadline : null,
+              note: String(t.note || "").trim(),
               subtasks: Array.isArray(t.subtasks)
                 ? t.subtasks
                     .map((s) => ({ title: String((s && s.title) || s || "").trim(), done: false }))
@@ -1779,6 +1788,9 @@
               .join("")}</ul>`
           : "";
 
+        // Verdichtete Zusatz-Infos landen in der Notiz (nur zur Anzeige hier).
+        const noteHtml = task.note ? `<div class="q-note">📝 ${escapeHtml(task.note)}</div>` : "";
+
         const row = document.createElement("div");
         row.className = "q-task" + (task.include ? "" : " excluded");
         row.innerHTML = `
@@ -1789,6 +1801,7 @@
               <span class="badge cat-${task.category}">${catInfo.icon} ${catInfo.label}</span>
               ${deadlineBadge}
             </div>
+            ${noteHtml}
             ${subHtml}
           </div>
         `;
@@ -1877,7 +1890,7 @@
             deadline: t.deadline,
             status: "offen",
             createdAt: new Date().toISOString(),
-            note: "",
+            note: t.note || "", // verdichtete Details aus der Schnelleingabe
             subtasks: t.subtasks.map((s) => ({ title: s.title, done: false })),
           });
         });
